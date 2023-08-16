@@ -1,0 +1,31 @@
+[package]
+name = "vapoursynth4-sys"
+edition = "2021"
+version = "0.1.0"
+authors = ["Xanthophobia <me@shimotsuki.ink>"]
+description = "Rust bindings for vapoursynth and vsscript API version 4."
+license = "MPL-2.0"
+
+repository = "https://github.com/inflation/vapoursynth4-rs"
+keywords = ["vapoursynth", "vsscript", "video", "bindings"]
+categories = ["external-ffi-bindings", "multimedia::video"]
+
+[dependencies]
+
+[features]
+# Features for enabling higher API versions.
+vsscript = []
+vsscript-41 = []
+
+# Experimental features.
+vs-graph = []
+
+default = [
+    "vsscript",
+    "vsscript-41",
+    "vs-graph"
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
