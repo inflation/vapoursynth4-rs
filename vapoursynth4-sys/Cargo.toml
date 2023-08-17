@@ -3,10 +3,11 @@ name = "vapoursynth4-sys"
 edition = "2021"
 version = "0.1.0"
 authors = ["Xanthophobia <me@shimotsuki.ink>"]
-description = "Rust bindings for vapoursynth and vsscript API version 4."
+description = "Rust bindings for VapourSynth and VSScript API version 4"
 license = "MPL-2.0"
 
 repository = "https://github.com/inflation/vapoursynth4-rs"
+documentation = "https://docs.rs/vapoursynth4-sys"
 keywords = ["vapoursynth", "vsscript", "video", "bindings"]
 categories = ["external-ffi-bindings", "multimedia::video"]
 

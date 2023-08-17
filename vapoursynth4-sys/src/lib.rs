@@ -26,8 +26,9 @@ pub use crate::vsscript::*;
 
 #[macro_export]
 macro_rules! opaque_struct {
-    ($($name:ident),+) => {
+    ($($(#[$outer:meta])*$name:ident),+) => {
         $(
+            $(#[$outer])*
             #[repr(C)]
             pub struct $name {
                 _data: [u8; 0],
@@ -38,14 +39,8 @@ macro_rules! opaque_struct {
 }
 
 #[must_use]
-pub const fn VS_MAKE_VERSION(major: i32, minor: i32) -> i32 {
-    (major << 16) | minor
+/// Used to create version numbers.
+/// The first argument is the major version and second is the minor.
+pub const fn VS_MAKE_VERSION(major: u16, minor: u16) -> i32 {
+    ((major as i32) << 16) | minor as i32
 }
-
-pub const VAPOURSYNTH_API_VERSION: i32 = VS_MAKE_VERSION(4, 0);
-
-pub const VSSCRIPT_API_VERSION: i32 = if cfg!(feature = "vsscript-api-41") {
-    VS_MAKE_VERSION(4, 1)
-} else {
-    VS_MAKE_VERSION(4, 0)
-};

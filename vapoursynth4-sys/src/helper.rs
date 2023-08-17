@@ -42,7 +42,7 @@ impl VSAPI {
     #[inline]
     pub unsafe fn isSameVideoPresetFormat(
         &self,
-        presetFormat: VSPresetFormat,
+        presetFormat: VSPresetVideoFormat,
         v: &VSVideoFormat,
         core: *mut VSCore,
     ) -> bool {
