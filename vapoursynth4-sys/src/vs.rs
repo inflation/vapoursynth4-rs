@@ -18,7 +18,7 @@ use super::*;
 pub const VAPOURSYNTH_API_MAJOR: u16 = 4;
 /// Minor API version. It is bumped when new functions are added to [`VSAPI`]
 /// or core behavior is noticeably changed.
-pub const VAPOURSYNTH_API_MINOR: u16 = if cfg!(feature = "vsscript-41") { 1 } else { 0 };
+pub const VAPOURSYNTH_API_MINOR: u16 = 0;
 /// API version. The high 16 bits are [`VAPOURSYNTH_API_MAJOR`], the low 16 bits are
 /// [`VAPOURSYNTH_API_MINOR`].
 pub const VAPOURSYNTH_API_VERSION: i32 =

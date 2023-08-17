@@ -35,7 +35,7 @@ use std::ffi::*;
 use super::*;
 
 pub const VSSCRIPT_API_MAJOR: u16 = 4;
-pub const VSSCRIPT_API_MINOR: u16 = 1;
+pub const VSSCRIPT_API_MINOR: u16 = if cfg!(feature = "vsscript-41") { 1 } else { 0 };
 pub const VSSCRIPT_API_VERSION: i32 = VS_MAKE_VERSION(VSSCRIPT_API_MAJOR, VSSCRIPT_API_MINOR);
 
 opaque_struct!(
