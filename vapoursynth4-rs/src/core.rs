@@ -1,19 +1,82 @@
-use std::{marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
+/*
+ This Source Code Form is subject to the terms of the Mozilla Public
+ License, v. 2.0. If a copy of the MPL was not distributed with this
+ file, You can obtain one at http://mozilla.org/MPL/2.0/.
+*/
+
+use std::{mem::MaybeUninit, ptr::NonNull};
 
 use ffi::VSCoreInfo;
 use vapoursynth4_sys as ffi;
 
-use crate::ApiRef;
+use crate::{api, ApiRef, API};
 
-pub struct Core<'c> {
+pub struct Core {
     handle: NonNull<ffi::VSCore>,
-    _marker: PhantomData<&'c ()>,
-    api: ApiRef,
+}
+
+impl Core {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::new_with(ApiRef::default(), 0)
+    }
+
+    fn new_with(api: ApiRef, flags: i32) -> Self {
+        API.set(api);
+        let core = unsafe { (api.createCore)(flags) };
+        unsafe {
+            Self {
+                // Safety: `core` is always a valid pointer to a `VSCore` instance.
+                handle: NonNull::new_unchecked(core),
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn as_ptr(&self) -> *mut ffi::VSCore {
+        self.handle.as_ptr()
+    }
+
+    pub fn set_max_cache_size(&mut self, size: i64) {
+        unsafe {
+            (api().setMaxCacheSize)(size, self.handle.as_ptr());
+        }
+    }
+
+    pub fn set_thread_count(&mut self, count: i32) {
+        unsafe {
+            (api().setThreadCount)(count, self.handle.as_ptr());
+        }
+    }
+
+    #[must_use]
+    pub fn get_info(&self) -> VSCoreInfo {
+        unsafe {
+            let mut info = MaybeUninit::uninit();
+            (api().getCoreInfo)(self.handle.as_ptr(), info.as_mut_ptr());
+            info.assume_init()
+        }
+    }
+}
+
+impl Default for Core {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for Core {
+    fn drop(&mut self) {
+        unsafe {
+            (api().freeCore)(self.handle.as_ptr());
+        }
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct CoreBuilder {
     flags: i32,
+    api: Option<ApiRef>,
     max_cache_size: Option<i64>,
     thread_count: Option<i32>,
 }
@@ -25,8 +88,8 @@ impl CoreBuilder {
     }
 
     #[must_use]
-    pub fn build<'c>(self, api: ApiRef) -> Core<'c> {
-        let mut core = Core::new_with(api, self.flags);
+    pub fn build(self) -> Core {
+        let mut core = Core::new_with(self.api.unwrap_or_default(), self.flags);
         if let Some(size) = self.max_cache_size {
             core.set_max_cache_size(size);
         }
@@ -60,59 +123,10 @@ impl CoreBuilder {
         self.thread_count = Some(count);
         self
     }
-}
 
-impl<'c> Core<'c> {
-    #[must_use]
-    pub fn new(api: ApiRef) -> Self {
-        Self::new_with(api, 0)
-    }
-
-    #[must_use]
-    pub fn new_with(api: ApiRef, flags: i32) -> Self {
-        let core = unsafe { (api.createCore)(flags) };
-        unsafe {
-            Self {
-                // Safety: `core` is always a valid pointer to a `VSCore` instance.
-                handle: NonNull::new_unchecked(core),
-                _marker: PhantomData,
-                api,
-            }
-        }
-    }
-
-    #[must_use]
-    pub fn api(&self) -> ApiRef {
-        self.api
-    }
-
-    pub fn set_max_cache_size(&mut self, size: i64) {
-        unsafe {
-            (self.api.setMaxCacheSize)(size, self.handle.as_ptr());
-        }
-    }
-
-    pub fn set_thread_count(&mut self, count: i32) {
-        unsafe {
-            (self.api.setThreadCount)(count, self.handle.as_ptr());
-        }
-    }
-
-    #[must_use]
-    pub fn get_info(&self) -> VSCoreInfo {
-        unsafe {
-            let mut info = MaybeUninit::uninit();
-            (self.api.getCoreInfo)(self.handle.as_ptr(), info.as_mut_ptr());
-            info.assume_init()
-        }
-    }
-}
-
-impl Drop for Core<'_> {
-    fn drop(&mut self) {
-        unsafe {
-            (self.api.freeCore)(self.handle.as_ptr());
-        }
+    pub fn api(&mut self, api: ApiRef) -> &mut Self {
+        self.api = Some(api);
+        self
     }
 }
 
@@ -121,15 +135,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_api() {
+        let core = Core::new();
+        let info = core.get_info();
+        println!("{info:?}");
+    }
+
+    #[test]
     fn test_builder() {
-        let api = ApiRef::new().unwrap();
         let core = CoreBuilder::new()
             .enable_graph_inspection()
             .disable_auto_loading()
             .disable_library_unloading()
             .max_cache_size(1024)
             .thread_count(4)
-            .build(api);
+            .build();
         assert_eq!(core.get_info().maxFramebufferSize, 1024);
         assert_eq!(core.get_info().numThreads, 4);
     }

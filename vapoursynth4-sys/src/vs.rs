@@ -478,6 +478,14 @@ pub enum VSCoreCreationFlags {
     ccfDisableLibraryUnloading = 4,
 }
 
+impl std::ops::BitOr for VSCoreCreationFlags {
+    type Output = c_int;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        self as c_int | rhs as c_int
+    }
+}
+
 /// Options when loading a plugin.
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -485,6 +493,14 @@ pub enum VSPluginConfigFlags {
     /// Allow functions to be added to the plugin object after the plugin loading phase.
     /// Mostly useful for Avisynth compatibility and other foreign plugin loaders.
     pcModifiable = 1,
+}
+
+impl std::ops::BitOr for VSPluginConfigFlags {
+    type Output = c_int;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        self as c_int | rhs as c_int
+    }
 }
 
 /// Since the data type can contain both pure binary data and printable strings,
@@ -575,7 +591,7 @@ pub type VSInitPlugin =
 pub type VSFreeFunctionData = Option<unsafe extern "system" fn(userData: *mut c_void)>;
 pub type VSFilterGetFrame = unsafe extern "system" fn(
     n: c_int,
-    activationReason: c_int,
+    activationReason: VSActivationReason,
     instanceData: *mut c_void,
     frameData: *mut *mut c_void,
     frameCtx: *mut VSFrameContext,
@@ -675,9 +691,9 @@ pub struct VSPLUGINAPI {
 #[derive(Eq, PartialEq, Hash, Debug)]
 pub struct VSFilterDependency {
     /// The node frames are requested from.
-    source: *mut VSNode,
+    pub source: *mut VSNode,
     /// A value from [`VSRequestPattern`].
-    requestPattern: VSRequestPattern,
+    pub requestPattern: VSRequestPattern,
 }
 
 /// This giant struct is the way to access `VapourSynth`'s public API.
@@ -710,7 +726,7 @@ pub struct VSAPI {
     /// * `instanceData` - A pointer to the private filter data. This pointer will be passed to
     ///     the `getFrame` and `free` functions. It should be freed by the free function.
     ///
-    /// After this function returns, out will contain the new node appended to
+    /// After this function returns, `out` will contain the new node appended to
     /// the "clip" property, or an error, if something went wrong.
     pub createVideoFilter: unsafe extern "system" fn(
         out: *mut VSMap,
@@ -733,7 +749,7 @@ pub struct VSAPI {
         vi: *const VSVideoInfo,
         getFrame: VSFilterGetFrame,
         free: VSFilterFree,
-        filterMode: c_int,
+        filterMode: VSFilterMode,
         dependencies: *const VSFilterDependency,
         numDeps: c_int,
         instanceData: *mut c_void,
@@ -773,7 +789,7 @@ pub struct VSAPI {
         ai: *const VSAudioInfo,
         getFrame: VSFilterGetFrame,
         free: VSFilterFree,
-        filterMode: c_int,
+        filterMode: VSFilterMode,
         dependencies: *const VSFilterDependency,
         numDeps: c_int,
         instanceData: *mut c_void,
@@ -788,7 +804,7 @@ pub struct VSAPI {
         ai: *const VSAudioInfo,
         getFrame: VSFilterGetFrame,
         free: VSFilterFree,
-        filterMode: c_int,
+        filterMode: VSFilterMode,
         dependencies: *const VSFilterDependency,
         numDeps: c_int,
         instanceData: *mut c_void,
@@ -834,7 +850,7 @@ pub struct VSAPI {
     pub freeNode: unsafe extern "system" fn(node: *mut VSNode),
     /// Increment the reference count of a node. Returns the same node for convenience.
     pub addNodeRef: unsafe extern "system" fn(node: *mut VSNode) -> *mut VSNode,
-    ///Returns [`VSMediaType`]. Used to determine if a node is of audio or video type.
+    /// Returns [`VSMediaType`]. Used to determine if a node is of audio or video type.
     pub getNodeType: unsafe extern "system" fn(node: *mut VSNode) -> VSMediaType,
     /// Returns a pointer to the video info associated with a node.
     /// The pointer is valid as long as the node lives.
@@ -1396,8 +1412,11 @@ pub struct VSAPI {
     /// Creates an empty array of type in key.
     ///
     /// Returns non-zero value on failure due to key already existing or having an invalid name.
-    pub mapSetEmpty:
-        unsafe extern "system" fn(map: *mut VSMap, key: *const c_char, type_: c_int) -> c_int,
+    pub mapSetEmpty: unsafe extern "system" fn(
+        map: *mut VSMap,
+        key: *const c_char,
+        type_: VSPropertyType,
+    ) -> c_int,
 
     /// Retrieves an integer from a specified key in a map.
     ///
@@ -1422,7 +1441,7 @@ pub struct VSAPI {
         map: *const VSMap,
         key: *const c_char,
         index: c_int,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> i64,
     /// Works just like [`mapGetInt()`](Self::mapGetInt) except that the value returned is
     /// also converted to an integer using saturation.
@@ -1430,7 +1449,7 @@ pub struct VSAPI {
         map: *const VSMap,
         key: *const c_char,
         index: c_int,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> c_int,
     /// Retrieves an array of integers from a map. Use this function if there are a lot of numbers
     /// associated with a key, because it is faster than calling
@@ -1445,7 +1464,7 @@ pub struct VSAPI {
     pub mapGetIntArray: unsafe extern "system" fn(
         map: *const VSMap,
         key: *const c_char,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> *const i64,
     /// Sets an integer to the specified key in a map.
     ///
@@ -1500,7 +1519,7 @@ pub struct VSAPI {
         map: *const VSMap,
         key: *const c_char,
         index: c_int,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> c_double,
     /// Works just like [`mapGetFloat()`](Self::mapGetFloat) except that the value returned
     /// is also converted to a float.
@@ -1508,7 +1527,7 @@ pub struct VSAPI {
         map: *const VSMap,
         key: *const c_char,
         index: c_int,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> c_float,
     /// Retrieves an array of floating point numbers from a map. Use this function if there are
     /// a lot of numbers associated with a key, because it is faster than calling
@@ -1523,7 +1542,7 @@ pub struct VSAPI {
     pub mapGetFloatArray: unsafe extern "system" fn(
         map: *const VSMap,
         key: *const c_char,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> *const c_double,
     /// Sets a float to the specified key in a map.
     ///
@@ -1579,7 +1598,7 @@ pub struct VSAPI {
         map: *const VSMap,
         key: *const c_char,
         index: c_int,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> *const c_char,
     /// Returns the size in bytes of a property of type ptData (see [`VSPropertyType`]),
     /// or 0 in case of error. The terminating `NULL` byte added by
@@ -1591,7 +1610,7 @@ pub struct VSAPI {
         map: *const VSMap,
         key: *const c_char,
         index: c_int,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> c_int,
     /// Returns the size in bytes of a property of type ptData (see [`VSPropertyType`]),
     /// or 0 in case of error. The terminating `NULL` byte added by
@@ -1603,7 +1622,7 @@ pub struct VSAPI {
         map: *const VSMap,
         key: *const c_char,
         index: c_int,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> VSDataTypeHint,
     /// Sets binary data to the specified key in a map.
     ///
@@ -1649,7 +1668,7 @@ pub struct VSAPI {
         map: *const VSMap,
         key: *const c_char,
         index: c_int,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> *mut VSNode,
     /// Sets a node to the specified key in a map.
     ///
@@ -1687,7 +1706,7 @@ pub struct VSAPI {
         map: *const VSMap,
         key: *const c_char,
         index: c_int,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> *const VSFrame,
     /// Sets a frame to the specified key in a map.
     ///
@@ -1723,7 +1742,7 @@ pub struct VSAPI {
         map: *const VSMap,
         key: *const c_char,
         index: c_int,
-        error: *mut c_int,
+        error: *mut VSMapPropertyError,
     ) -> *mut VSFunction,
     /// Sets a function object to the specified key in a map.
     ///
@@ -2001,7 +2020,7 @@ pub struct VSAPI {
     ///
     /// * `msg` - The message.
     pub logMessage:
-        unsafe extern "system" fn(msgType: c_int, msg: *const c_char, core: *mut VSCore),
+        unsafe extern "system" fn(msgType: VSMessageType, msg: *const c_char, core: *mut VSCore),
     /// Installs a custom handler for the various error messages VapourSynth emits.
     /// The message handler is per [`VSCore`] instance. Returns a unique handle.
     ///
@@ -2115,6 +2134,11 @@ mod tests {
             std::mem::size_of::<VSMapAppendMode>(),
             std::mem::size_of::<c_int>(),
             "VSMapAppendMode"
+        );
+        assert_eq!(
+            std::mem::size_of::<VSMessageType>(),
+            std::mem::size_of::<c_int>(),
+            "VSMessageType"
         );
     }
 }
