@@ -16,6 +16,7 @@ pub enum Info<'n> {
     Audio(&'n AudioInfo),
 }
 
+#[derive(Debug)]
 pub struct NodeRef {
     handle: NonNull<ffi::VSNode>,
 }

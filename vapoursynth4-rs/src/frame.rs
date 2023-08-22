@@ -8,6 +8,9 @@ use std::ptr::NonNull;
 
 use vapoursynth4_sys as ffi;
 
+use crate::api;
+
+#[derive(Debug)]
 pub struct FrameRef {
     handle: NonNull<ffi::VSFrame>,
 }
@@ -22,5 +25,14 @@ impl FrameRef {
     #[must_use]
     pub fn as_mut_ptr(&self) -> *mut ffi::VSFrame {
         self.handle.as_ptr()
+    }
+}
+
+impl Clone for FrameRef {
+    fn clone(&self) -> Self {
+        Self {
+            /// Safety: `self.handle` is a valid pointer
+            handle: unsafe { NonNull::new_unchecked((api().addFrameRef)(self.handle.as_ptr())) },
+        }
     }
 }

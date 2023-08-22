@@ -4,6 +4,7 @@ use vapoursynth4_sys as ffi;
 
 use crate::{api, Core, Map};
 
+#[derive(Debug)]
 pub struct FunctionRef {
     handle: NonNull<ffi::VSFunction>,
 }
@@ -39,6 +40,7 @@ impl FunctionRef {
         }
     }
 
+    #[must_use]
     pub fn as_mut_ptr(&self) -> *mut ffi::VSFunction {
         self.handle.as_ptr()
     }

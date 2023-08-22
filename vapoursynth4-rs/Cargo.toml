@@ -13,3 +13,7 @@ repository = "https://github.com/inflation/vapoursynth4-rs"
 once_cell = "1.18.0"
 thiserror = "1.0.47"
 vapoursynth4-sys = {version = "0.1.0", path = "../vapoursynth4-sys"}
+
+[dev-dependencies]
+const-str = "0.5.6"
+testresult = "0.3.0"
