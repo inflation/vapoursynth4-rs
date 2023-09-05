@@ -10,9 +10,10 @@
 mod api;
 mod constants;
 mod core;
+pub mod error;
 mod frame;
 mod function;
-mod map;
+pub mod map;
 mod node;
 pub mod plugin;
 mod utils;
@@ -24,3 +25,5 @@ pub use frame::*;
 pub use function::*;
 pub use map::*;
 pub use node::*;
+
+use vapoursynth4_sys as ffi;

@@ -5,10 +5,10 @@
 */
 
 // VapourSynth4.h
-//! This is VapourSynth’s main header file.
+//! This is `VapourSynth`'s main header file.
 //! Plugins and applications that use the library must include it.
 //!
-//! VapourSynth’s public API is all C.
+//! `VapourSynth`'s public API is all C.
 
 use std::ffi::*;
 
@@ -586,9 +586,62 @@ pub type VSPublicFunction = unsafe extern "system" fn(
     core: *mut VSCore,
     vsapi: *const VSAPI,
 );
+/// A plugin's entry point. It must be called `VapourSynthPluginInit2`.
+/// This function is called after the core loads the shared library.
+/// Its purpose is to configure the plugin and to register the filters the plugin wants to export.
+///
+/// # Arguments
+///
+/// * `plugin` - A pointer to the plugin object to be initialized.
+/// * `vspapi` - A pointer to a [`VSPLUGINAPI`] struct with a subset of the `VapourSynth` API
+///     used for initializing plugins. The proper way to do things is to call
+///     [`configPlugin`](VSPLUGINAPI::configPlugin) and then
+///     [`registerFunction`](VSPLUGINAPI::registerFunction) for each function to export.
 pub type VSInitPlugin =
     unsafe extern "system" fn(plugin: *mut VSPlugin, vspapi: *const VSPLUGINAPI);
+///
 pub type VSFreeFunctionData = Option<unsafe extern "system" fn(userData: *mut c_void)>;
+/// A filter's "getFrame" function. It is called by the core when it needs the filter
+/// to generate a frame.
+///
+/// It is possible to allocate local data, persistent during the multiple calls
+/// requesting the output frame.
+///
+/// In case of error, call [`setFilterError()`](VSAPI::setFilterError),
+/// free `*frameData` if required, and return `NULL`.
+///
+/// Depending on the [`VSFilterMode`] set for the filter, multiple output frames
+/// could be requested concurrently.
+///
+/// It is never called concurrently for the same frame number.
+///
+/// # Arguments
+///
+/// * `n` - Requested frame number.
+/// * `activationReason` - One of [`VSActivationReason`].
+///
+///     ## Note
+///
+///     This function is first called with [`VSActivationReason::arInitial`].
+///     At this point the function should request the input frames it needs and return `NULL`.
+///     When one or all of the requested frames are ready, this function is called again with
+///     [`VSActivationReason::arAllFramesReady`].
+///     The function should only return a frame when called with
+///     [`VSActivationReason::arAllFramesReady`].
+///
+///     If a the function is called with [`VSActivationReason::arError`] all processing has
+///     to be aborted and any.
+///
+/// * `instanceData` - The filter's private instance data.
+/// * `frameData` - Optional private data associated with output frame number `n`.
+///     It must be deallocated before the last call for the given frame
+///     ([`VSActivationReason::arAllFramesReady`] or error).
+///
+///     It points to a `void *[4]` array of memory that may be used freely.
+///     See filters like Splice and Trim for examples.
+///
+/// Return a reference to the output frame number n when it is ready, or `NULL`.
+/// The ownership of the frame is transferred to the caller.
 pub type VSFilterGetFrame = unsafe extern "system" fn(
     n: c_int,
     activationReason: VSActivationReason,
@@ -598,6 +651,13 @@ pub type VSFilterGetFrame = unsafe extern "system" fn(
     core: *mut VSCore,
     vsapi: *const VSAPI,
 ) -> *const VSFrame;
+/// A filter's "free" function.
+///
+/// This is where the filter should free everything it allocated, including its instance data.
+//
+/// # Arguments
+///
+/// * `instanceData` - The filter's private instance data.
 pub type VSFilterFree = Option<
     unsafe extern "system" fn(instanceData: *mut c_void, core: *mut VSCore, vsapi: *const VSAPI),
 >;
@@ -696,6 +756,7 @@ pub struct VSFilterDependency {
     pub requestPattern: VSRequestPattern,
 }
 
+// SECTION - VSAPI
 /// This giant struct is the way to access `VapourSynth`'s public API.
 #[repr(C)]
 pub struct VSAPI {
@@ -821,7 +882,7 @@ pub struct VSAPI {
     ///
     /// Resets the cache to default options when called, discarding
     /// [`setCacheOptions`](Self::setCacheOptions) changes.
-    pub setCacheMode: unsafe extern "system" fn(node: *mut VSNode, mode: c_int),
+    pub setCacheMode: unsafe extern "system" fn(node: *mut VSNode, mode: VSCacheMode),
     /// Call after setCacheMode or the changes will be discarded.
     /// Sets internal details of a node's associated cache.
     /// Calls to this function may also be silently ignored.
@@ -918,11 +979,10 @@ pub struct VSAPI {
     ///
     /// (assume frameA, frameB, frameC are existing frames):
     ///
-    /// ```
-    /// let frames = [frameA, frameB, frameC];
-    /// let planes = [1, 0, 2];
-    /// let newFrame = (api.newVideoFrame2)(f, w, h, frames.as_ptr(),
-    ///     planes.as_ptr(), frameB, core);
+    /// ```c
+    /// const VSFrame * frames[3] = { frameA, frameB, frameC };
+    /// const int planes[3] = { 1, 0, 2 };
+    /// VSFrame *newFrame = vsapi->newVideoFrame2(f, w, h, frames, planes, frameB, core);
     /// ```
     ///
     /// The newFrame's first plane is now a copy of frameA's second plane,
@@ -1040,7 +1100,7 @@ pub struct VSAPI {
     /// Retrieves the format of an audio frame.
     pub getAudioFrameFormat: unsafe extern "system" fn(f: *const VSFrame) -> *const VSAudioFormat,
     /// Returns a value from [`VSMediaType`] to distinguish audio and video frames.
-    pub getFrameType: unsafe extern "system" fn(f: *const VSFrame) -> c_int,
+    pub getFrameType: unsafe extern "system" fn(f: *const VSFrame) -> VSMediaType,
     /// Returns the width of a plane of a given video frame, in pixels.
     /// The width depends on the plane number because of the possible chroma subsampling.
     ///
@@ -1061,9 +1121,8 @@ pub struct VSAPI {
     /// # Arguments
     ///
     /// * `format` - The input video format.
-    ///
     /// * `buffer` - Destination buffer. At most 32 bytes including
-    ///     terminating `NULL` will be written.
+    ///     terminating `NUL` will be written.
     ///
     /// Returns non-zero on success.
     pub getVideoFormatName:
@@ -1073,32 +1132,26 @@ pub struct VSAPI {
     /// # Arguments
     ///
     /// * `format` - The input audio format.
-    ///
     /// * `buffer` - Destination buffer. At most 32 bytes including
-    ///     terminating `NULL` will be written.
+    ///     terminating `NUL` will be written.
     ///
     /// Returns non-zero on success.
     pub getAudioFormatName:
         unsafe extern "system" fn(format: *const VSAudioFormat, buffer: *mut c_char) -> c_int,
-    /// Fills out a [`VSVideoInfo`] struct based on the provided arguments.
+    /// Fills out a [_sic_] [`VSVideoInfo`] struct based on the provided arguments.
     /// Validates the arguments before filling out format.
     ///
     /// # Arguments
     ///
     /// * `format` - The struct to fill out.
-    ///
     /// * `colorFamily` - One of [`VSColorFamily`].
-    ///
     /// * `sampleType` - One of [`VSSampleType`].
-    ///
     /// * `bitsPerSample` - Number of meaningful bits for a single component.
     ///     The valid range is 8-32.
     ///
     ///     For floating point formats only 16 or 32 bits are allowed.
-    ///
     /// * `subSamplingW` - log2 of the horizontal chroma subsampling.
     ///     0 == no subsampling. The valid range is 0-4.
-    ///
     /// * `subSamplingH` - log2 of the vertical chroma subsampling.
     ///     0 == no subsampling. The valid range is 0-4.
     ///
@@ -2084,6 +2137,7 @@ pub struct VSAPI {
     pub getNumNodeDependencies: unsafe extern "system" fn(node: *mut VSNode) -> c_int,
     // !SECTION
 }
+// !SECTION
 
 extern "system" {
     /// Returns a pointer to the global [`VSAPI`] instance.
@@ -2139,6 +2193,11 @@ mod tests {
             std::mem::size_of::<VSMessageType>(),
             std::mem::size_of::<c_int>(),
             "VSMessageType"
+        );
+        assert_eq!(
+            std::mem::size_of::<VSCacheMode>(),
+            std::mem::size_of::<c_int>(),
+            "VSCacheMode"
         );
     }
 }

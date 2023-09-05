@@ -7,6 +7,7 @@ use std::{
 use thiserror::Error;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[repr(transparent)]
 pub struct Key {
     inner: CString,
 }
@@ -58,6 +59,7 @@ impl Display for Key {
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[repr(transparent)]
 pub struct KeyStr {
     inner: CStr,
 }
@@ -131,12 +133,11 @@ pub mod __macro_impl {
 macro_rules! key {
     ($s:expr) => {{
         const OUTPUT_LEN: ::core::primitive::usize =
-            $crate::map::key::__macro_impl::ToCStr($s).output_len();
-        const OUTPUT_BUF: [u8; OUTPUT_LEN] =
-            $crate::map::key::__macro_impl::ToCStr($s).const_eval();
+            $crate::map::__macro_impl::ToCStr($s).output_len();
+        const OUTPUT_BUF: [u8; OUTPUT_LEN] = $crate::map::__macro_impl::ToCStr($s).const_eval();
         const OUTPUT: &::core::ffi::CStr =
             unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(&OUTPUT_BUF) };
-        $crate::map::key::KeyStr::from_cstr(OUTPUT)
+        $crate::map::KeyStr::from_cstr(OUTPUT)
     }};
 }
 

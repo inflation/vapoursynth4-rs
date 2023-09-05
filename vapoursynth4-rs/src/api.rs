@@ -7,14 +7,30 @@
 use std::{ops::Deref, ptr::NonNull};
 
 use once_cell::sync::OnceCell;
-use vapoursynth4_sys as ffi;
+
+use crate::ffi;
+
+pub(crate) static API: OnceCell<ApiRef> = OnceCell::new();
+
+pub(crate) fn api() -> &'static ApiRef {
+    API.get_or_init(ApiRef::default)
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(transparent)]
 pub struct ApiRef {
     handle: NonNull<ffi::VSAPI>,
 }
 
 impl ApiRef {
+    /// # Safety
+    #[must_use]
+    pub unsafe fn from_raw(ptr: *const ffi::VSAPI) -> Self {
+        Self {
+            handle: NonNull::new_unchecked(ptr.cast_mut()),
+        }
+    }
+
     #[must_use]
     pub fn new() -> Option<Self> {
         Self::new_with_version(ffi::VAPOURSYNTH_API_VERSION)
@@ -35,6 +51,10 @@ impl ApiRef {
     pub fn get_version(&self) -> i32 {
         unsafe { (self.getAPIVersion)() }
     }
+
+    pub fn set(self) -> Option<()> {
+        API.set(self).ok()
+    }
 }
 
 impl Deref for ApiRef {
@@ -50,15 +70,13 @@ impl Default for ApiRef {
     ///
     /// Panic if [`getVapourSynthAPI()`](ffi::getVapourSynthAPI) returns `NULL`
     fn default() -> Self {
-        Self::new().unwrap()
+        Self::new().expect(
+            "Failed to get API with the version specified by features. \
+             Check if the version is supported by the linked VapourSynth library, \
+             or lowering the requirement in `Cargo.toml`.",
+        )
     }
 }
 
 unsafe impl Send for ApiRef {}
 unsafe impl Sync for ApiRef {}
-
-pub(crate) static API: OnceCell<ApiRef> = OnceCell::new();
-
-pub fn api() -> &'static ApiRef {
-    API.get_or_init(ApiRef::default)
-}

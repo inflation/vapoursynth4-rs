@@ -1,3 +1,3 @@
 [workspace]
-members = ["vapoursynth4-sys", "vapoursynth4-rs", "sample-plugin"]
+members = ["vapoursynth4-sys", "vapoursynth4-rs", "vapoursynth4-rs-macros", "sample-plugin"]
 resolver = "2"
