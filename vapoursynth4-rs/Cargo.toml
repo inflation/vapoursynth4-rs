@@ -10,7 +10,6 @@ repository = "https://github.com/inflation/vapoursynth4-rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-once_cell = "1.18.0"
 thiserror = "1.0.47"
 vapoursynth4-sys = {version = "0.1.0", path = "../vapoursynth4-sys"}
 # vapoursynth4-rs-macros = { version = "0.1.0", path = "../vapoursynth4-rs-macros", optional = true}

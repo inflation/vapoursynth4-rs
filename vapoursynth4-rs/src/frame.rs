@@ -4,7 +4,12 @@
  file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-use std::ptr::NonNull;
+use std::{
+    borrow::Borrow,
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+    ptr::NonNull,
+};
 
 use crate::{api, ffi, MapMut, MapRef, MediaType};
 
@@ -15,14 +20,15 @@ pub use context::*;
 pub use format::*;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
-pub struct FrameRef {
+#[repr(transparent)]
+pub struct Frame {
     handle: NonNull<ffi::VSFrame>,
 }
 
-impl FrameRef {
+impl Frame {
     #[must_use]
-    pub unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> FrameRef {
-        FrameRef {
+    pub unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self {
+        Self {
             handle: NonNull::new_unchecked(ptr.cast_mut()),
         }
     }
@@ -125,13 +131,13 @@ impl FrameRef {
     }
 }
 
-impl Clone for FrameRef {
+impl Clone for Frame {
     fn clone(&self) -> Self {
         unsafe { Self::from_ptr((api().addFrameRef)(self.handle.as_ptr())) }
     }
 }
 
-impl Drop for FrameRef {
+impl Drop for Frame {
     fn drop(&mut self) {
         unsafe { (api().freeFrame)(self.handle.as_ptr()) }
     }

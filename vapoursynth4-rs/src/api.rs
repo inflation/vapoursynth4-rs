@@ -4,13 +4,11 @@
  file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-use std::{ops::Deref, ptr::NonNull};
-
-use once_cell::sync::OnceCell;
+use std::{ops::Deref, ptr::NonNull, sync::OnceLock};
 
 use crate::ffi;
 
-pub(crate) static API: OnceCell<ApiRef> = OnceCell::new();
+pub(crate) static API: OnceLock<ApiRef> = OnceLock::new();
 
 pub(crate) fn api() -> &'static ApiRef {
     API.get_or_init(ApiRef::default)
@@ -52,8 +50,8 @@ impl ApiRef {
         unsafe { (self.getAPIVersion)() }
     }
 
-    pub fn set(self) -> Option<()> {
-        API.set(self).ok()
+    pub fn set(self) -> Result<(), Self> {
+        API.set(self)
     }
 }
 

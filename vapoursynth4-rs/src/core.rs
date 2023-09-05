@@ -5,16 +5,16 @@
 */
 
 use std::{
-    ffi::{CStr, CString},
+    ffi::{c_int, c_void, CStr, CString},
     marker::PhantomData,
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
-    ptr::{null_mut, NonNull},
+    ptr::{null, null_mut, NonNull},
 };
 
 use crate::{
-    api, error::FilterError, ffi, ApiRef, AudioFormat, AudioInfo, ColorFamily, Filter, FrameRef,
-    FunctionRef, MapMut, SampleType, VideoFormat, VideoInfo,
+    api, error::FilterError, ffi, ApiRef, AudioFormat, AudioInfo, ColorFamily, Filter,
+    FilterExtern, Frame, FrameContext, FunctionRef, MapMut, SampleType, VideoFormat, VideoInfo,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -107,7 +107,7 @@ impl Core {
         mut out: MapMut<'_>,
         name: impl Into<Vec<u8>>,
         info: &VideoInfo,
-        mut filter: Box<F>,
+        filter: Box<F>,
         dependencies: &[ffi::VSFilterDependency],
     ) -> Result<(), FilterError> {
         unsafe {
@@ -116,15 +116,15 @@ impl Core {
                 out.as_mut_ptr(),
                 name.as_ptr(),
                 info,
-                filter.get_frame(),
-                filter.free(),
-                filter.filter_mode().into(),
+                F::filter_get_frame,
+                Some(F::filter_free),
+                F::FILTER_MODE.into(),
                 dependencies.as_ptr(),
                 dependencies
                     .len()
                     .try_into()
                     .map_err(|_| FilterError::TooMuchDependency)?,
-                filter.instance_data().cast(),
+                Box::into_raw(filter).cast(),
                 self.as_mut_ptr(),
             );
         }
@@ -134,7 +134,6 @@ impl Core {
                 String::from_utf8_lossy(e.as_bytes()).into(),
             ));
         }
-        Box::into_raw(filter);
 
         Ok(())
     }
@@ -147,9 +146,10 @@ impl Core {
         mut out: MapMut<'_>,
         name: impl Into<Vec<u8>>,
         info: &AudioInfo,
-        filter: &mut F,
+        filter: F,
         dependencies: &[ffi::VSFilterDependency],
     ) -> Result<(), CString> {
+        let filter = Box::new(filter);
         unsafe {
             let name = CString::new(name)
                 .map_err(|_| CString::from_vec_unchecked(b"Invalid name".to_vec()))?;
@@ -157,16 +157,16 @@ impl Core {
                 out.as_mut_ptr(),
                 name.as_ptr(),
                 info,
-                filter.get_frame(),
-                filter.free(),
-                filter.filter_mode().into(),
+                F::filter_get_frame,
+                Some(F::filter_free),
+                F::FILTER_MODE.into(),
                 dependencies.as_ptr(),
                 dependencies.len().try_into().map_err(|_| {
                     CString::from_vec_unchecked(
                         b"dependencies len is larger than i32::MAX".to_vec(),
                     )
                 })?,
-                (filter.instance_data() as *mut F::InstanceData).cast(),
+                Box::into_raw(filter).cast(),
                 self.as_mut_ptr(),
             );
         }
@@ -183,8 +183,8 @@ impl Core {
         format: &VideoFormat,
         width: i32,
         height: i32,
-        prop_src: Option<FrameRef>,
-    ) -> FrameRef {
+        prop_src: Option<&Frame>,
+    ) -> Frame {
         unsafe {
             let ptr = (api().newVideoFrame)(
                 format,
@@ -193,7 +193,7 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr()),
                 self.as_ptr().cast_mut(),
             );
-            FrameRef::from_ptr(ptr)
+            Frame::from_ptr(ptr)
         }
     }
 
@@ -205,8 +205,8 @@ impl Core {
         height: i32,
         plane_src: &[*const ffi::VSFrame],
         planes: &[i32],
-        prop_src: Option<FrameRef>,
-    ) -> FrameRef {
+        prop_src: Option<&Frame>,
+    ) -> Frame {
         unsafe {
             let ptr = (api().newVideoFrame2)(
                 format,
@@ -217,7 +217,7 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr()),
                 self.as_ptr().cast_mut(),
             );
-            FrameRef::from_ptr(ptr)
+            Frame::from_ptr(ptr)
         }
     }
 
@@ -226,8 +226,8 @@ impl Core {
         &self,
         format: &AudioFormat,
         num_samples: i32,
-        prop_src: Option<FrameRef>,
-    ) -> FrameRef {
+        prop_src: Option<&Frame>,
+    ) -> Frame {
         unsafe {
             let ptr = (api().newAudioFrame)(
                 format,
@@ -235,7 +235,7 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr()),
                 self.as_ptr().cast_mut(),
             );
-            FrameRef::from_ptr(ptr)
+            Frame::from_ptr(ptr)
         }
     }
 
@@ -246,8 +246,8 @@ impl Core {
         num_samples: i32,
         channel_src: &[*const ffi::VSFrame],
         channels: &[i32],
-        prop_src: Option<FrameRef>,
-    ) -> FrameRef {
+        prop_src: Option<&Frame>,
+    ) -> Frame {
         unsafe {
             let ptr = (api().newAudioFrame2)(
                 format,
@@ -257,13 +257,13 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr()),
                 self.as_ptr().cast_mut(),
             );
-            FrameRef::from_ptr(ptr)
+            Frame::from_ptr(ptr)
         }
     }
 
     #[must_use]
-    pub fn duplicate_frame(&self, frame: &FrameRef) -> FrameRef {
-        unsafe { FrameRef::from_ptr((api().copyFrame)(frame.as_ptr(), self.as_ptr().cast_mut())) }
+    pub fn copy_frame(&self, frame: &Frame) -> Frame {
+        unsafe { Frame::from_ptr((api().copyFrame)(frame.as_ptr(), self.as_ptr().cast_mut())) }
     }
 
     #[must_use]

@@ -6,6 +6,7 @@
 
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
+#![allow(warnings)]
 
 mod api;
 mod constants;
@@ -25,5 +26,6 @@ pub use frame::*;
 pub use function::*;
 pub use map::*;
 pub use node::*;
+pub use utils::*;
 
 use vapoursynth4_sys as ffi;

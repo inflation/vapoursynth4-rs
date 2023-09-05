@@ -5,6 +5,7 @@ use crate::{api, ffi, ColorFamily, Core, SampleType};
 pub type VideoFormat = ffi::VSVideoFormat;
 pub type AudioFormat = ffi::VSAudioFormat;
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Format<'f> {
     Video(&'f VideoFormat),
     Audio(&'f AudioFormat),

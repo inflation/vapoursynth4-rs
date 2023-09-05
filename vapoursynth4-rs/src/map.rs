@@ -8,7 +8,7 @@ use std::{
 
 use thiserror::Error;
 
-use crate::{api, ffi, FrameRef, FunctionRef, NodeRef};
+use crate::{api, ffi, Frame, FunctionRef, NodeRef};
 
 mod key;
 pub use key::*;
@@ -162,9 +162,17 @@ impl Map {
         ) -> T,
         key: &KeyStr,
         index: i32,
-        error: &mut ffi::VSMapPropertyError,
     ) -> Result<T, MapPropertyError> {
-        handle_get_error(func(self.as_ptr(), key.as_ptr(), index, error), *error)
+        let mut error = ffi::VSMapPropertyError::peSuccess;
+        handle_get_error(func(self.as_ptr(), key.as_ptr(), index, &mut error), error)
+    }
+
+    pub fn get_int(&self, key: &KeyStr, index: i32) -> Result<i64, MapPropertyError> {
+        unsafe { self._get(api().mapGetInt, key, index) }
+    }
+
+    pub fn get_float(&self, key: &KeyStr, index: i32) -> Result<f64, MapPropertyError> {
+        unsafe { self._get(api().mapGetFloat, key, index) }
     }
 
     /// # Errors
@@ -173,26 +181,18 @@ impl Map {
     pub fn get(&self, key: &KeyStr, index: i32) -> Result<Value, MapPropertyError> {
         use ffi::VSPropertyType as t;
 
-        let mut error = ffi::VSMapPropertyError::peSuccess;
-
         unsafe {
             match (api().mapGetType)(self.as_ptr(), key.as_ptr()) {
                 t::ptUnset => Err(MapPropertyError::KeyNotFound),
-                t::ptInt => {
-                    let res = self._get(api().mapGetInt, key, index, &mut error)?;
-                    Ok(Value::Int(res))
-                }
-                t::ptFloat => {
-                    let res = self._get(api().mapGetFloat, key, index, &mut error)?;
-                    Ok(Value::Float(res))
-                }
+                t::ptInt => self.get_int(key, index).map(Value::Int),
+                t::ptFloat => self.get_float(key, index).map(Value::Float),
                 t::ptData => {
                     use ffi::VSDataTypeHint as dt;
 
-                    let size = self._get(api().mapGetDataSize, key, index, &mut error)?;
-                    match self._get(api().mapGetDataTypeHint, key, index, &mut error)? {
+                    let size = self._get(api().mapGetDataSize, key, index)?;
+                    match self._get(api().mapGetDataTypeHint, key, index)? {
                         dt::dtUnknown | dt::dtBinary => {
-                            let ptr = self._get(api().mapGetData, key, index, &mut error)?;
+                            let ptr = self._get(api().mapGetData, key, index)?;
 
                             #[allow(clippy::cast_sign_loss)]
                             Ok(Value::Data(std::slice::from_raw_parts(
@@ -201,7 +201,7 @@ impl Map {
                             )))
                         }
                         dt::dtUtf8 => {
-                            let ptr = self._get(api().mapGetData, key, index, &mut error)?;
+                            let ptr = self._get(api().mapGetData, key, index)?;
 
                             #[allow(clippy::cast_sign_loss)]
                             Ok(Value::Utf8(std::str::from_utf8_unchecked(
@@ -211,24 +211,24 @@ impl Map {
                     }
                 }
                 t::ptFunction => {
-                    let res = self._get(api().mapGetFunction, key, index, &mut error)?;
+                    let res = self._get(api().mapGetFunction, key, index)?;
                     Ok(Value::Function(FunctionRef::from_ptr(res)))
                 }
                 t::ptVideoNode => {
-                    let res = self._get(api().mapGetNode, key, index, &mut error)?;
+                    let res = self._get(api().mapGetNode, key, index)?;
                     Ok(Value::VideoNode(NodeRef::from_ptr(res)))
                 }
                 t::ptAudioNode => {
-                    let res = self._get(api().mapGetNode, key, index, &mut error)?;
+                    let res = self._get(api().mapGetNode, key, index)?;
                     Ok(Value::AudioNode(NodeRef::from_ptr(res)))
                 }
                 t::ptVideoFrame => {
-                    let res = self._get(api().mapGetFrame, key, index, &mut error)?;
-                    Ok(Value::VideoFrame(FrameRef::from_ptr(res)))
+                    let res = self._get(api().mapGetFrame, key, index)?;
+                    Ok(Value::VideoFrame(Frame::from_ptr(res)))
                 }
                 t::ptAudioFrame => {
-                    let res = self._get(api().mapGetFrame, key, index, &mut error)?;
-                    Ok(Value::AudioFrame(FrameRef::from_ptr(res)))
+                    let res = self._get(api().mapGetFrame, key, index)?;
+                    Ok(Value::AudioFrame(Frame::from_ptr(res)))
                 }
             }
         }
@@ -238,8 +238,7 @@ impl Map {
     ///
     /// Return [`MapPropertyError`] if the underlying API does not success
     pub fn get_int_saturated(&self, key: &KeyStr, index: i32) -> Result<i32, MapPropertyError> {
-        let mut error = ffi::VSMapPropertyError::peSuccess;
-        unsafe { self._get(api().mapGetIntSaturated, key, index, &mut error) }
+        unsafe { self._get(api().mapGetIntSaturated, key, index) }
     }
 
     /// # Errors
@@ -265,9 +264,8 @@ impl Map {
     ///
     /// Return [`MapPropertyError`] if the underlying API does not success
     pub fn get_float_saturated(&self, key: &KeyStr, index: i32) -> Result<f32, MapPropertyError> {
-        let mut error = ffi::VSMapPropertyError::peSuccess;
         // safety: `self.handle` is a valid pointer
-        unsafe { self._get(api().mapGetFloatSaturated, key, index, &mut error) }
+        unsafe { self._get(api().mapGetFloatSaturated, key, index) }
     }
 
     /// # Errors
@@ -424,7 +422,7 @@ impl Map {
     pub fn consume_frame(
         &mut self,
         key: &KeyStr,
-        frame: FrameRef,
+        frame: Frame,
         append: AppendMode,
     ) -> Result<(), MapPropertyError> {
         let frame = ManuallyDrop::new(frame);
@@ -515,8 +513,8 @@ pub enum Value<'m> {
     Utf8(&'m str),
     VideoNode(NodeRef),
     AudioNode(NodeRef),
-    VideoFrame(FrameRef),
-    AudioFrame(FrameRef),
+    VideoFrame(Frame),
+    AudioFrame(Frame),
     Function(FunctionRef),
 }
 

@@ -1,11 +1,12 @@
-﻿---
+﻿# Basic set up for Cargo project
+
 version: 2
 updates:
 
   - package-ecosystem: "github-actions"
     directory: /
     schedule:
-      interval: "weekly"
+      interval: daily
     commit-message:
       prefix: "chore: :construction_worker: "
       include: scope
@@ -13,7 +14,7 @@ updates:
   - package-ecosystem: cargo
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
     commit-message:
       prefix: "chore: :arrow_up: "
       include: scope

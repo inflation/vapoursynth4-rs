@@ -1,118 +1,125 @@
 use std::{
-    ffi::{c_int, c_void, CString},
-    ptr::{null, null_mut},
+    ffi::{c_void, CString},
+    ptr::null_mut,
 };
 
 use const_str::cstr;
-use vapoursynth4_rs::{key, ApiRef, CoreRef, Filter, FrameContext, MapMut, MapRef, NodeRef, Value};
+use ffi::helper::isConstantVideoFormat;
+use vapoursynth4_rs::{
+    key, ApiRef, CoreRef, Filter, Frame, FrameContext, MapMut, MapRef, NodeRef, ToCString, Value,
+};
 use vapoursynth4_sys as ffi;
 
 struct DumbFilter {
     node: NodeRef,
+    enabled: bool,
 }
 
 impl Filter for DumbFilter {
-    type InstanceData = DumbFilter;
+    type Error = CString;
+    // const FILTER_MODE: vapoursynth4_rs::FilterMode = vapoursynth4_rs::FilterMode::Unordered;
 
-    fn get_frame(&self) -> ffi::VSFilterGetFrame {
-        filter_get_frame
-    }
+    fn get_frame(
+        &self,
+        n: i32,
+        activation_reason: ffi::VSActivationReason,
+        _frame_data: *mut *mut c_void,
+        mut ctx: FrameContext,
+        core: CoreRef,
+    ) -> Result<Option<Frame>, Self::Error> {
+        use ffi::VSActivationReason as r;
 
-    fn free(&self) -> ffi::VSFilterFree {
-        Some(filter_free)
-    }
+        match activation_reason {
+            r::arInitial => {
+                ctx.request_frame_filter(n, &self.node);
+            }
+            r::arAllFramesReady => {
+                let src = ctx.get_frame_filter(n, &self.node);
+                if !self.enabled {
+                    panic!("Not enabled");
+                }
 
-    fn filter_mode(&self) -> vapoursynth4_rs::FilterMode {
-        vapoursynth4_rs::FilterMode::Parallel
-    }
+                let fi = unsafe { src.get_video_format() };
+                let height = src.frame_height(0).unwrap();
+                let width = src.frame_width(0).unwrap();
 
-    fn instance_data(&mut self) -> *mut Self::InstanceData {
-        self
-    }
-}
+                let mut dst = core.new_video_frame(fi, width, height, Some(&src));
 
-/// # Safety
-pub unsafe extern "system" fn filter_get_frame(
-    n: c_int,
-    activation_reason: ffi::VSActivationReason,
-    instance_data: *mut c_void,
-    frame_data: *mut *mut c_void,
-    frame_ctx: *mut ffi::VSFrameContext,
-    core: *mut ffi::VSCore,
-    vsapi: *const ffi::VSAPI,
-) -> *const ffi::VSFrame {
-    use ffi::VSActivationReason as r;
+                for plane in 0..fi.numPlanes {
+                    let mut src_p = src.plane(plane);
+                    let src_stride = src.stride(plane).unwrap();
+                    let mut dst_p = dst.plane_mut(plane);
+                    let dst_stride = dst.stride(plane).unwrap();
 
-    let d = &mut *(instance_data as *mut DumbFilter);
-    let api = ApiRef::from_raw(vsapi);
-    _ = api.set();
-    let mut ctx = FrameContext::from_ptr(frame_ctx);
+                    let h = src.frame_height(plane).unwrap();
+                    let w = src.frame_width(plane).unwrap();
 
-    match activation_reason {
-        r::arInitial => ctx.request_frame_filter(n, &d.node),
-        r::arAllFramesReady => {
-            let mut core = CoreRef::from_ptr(core);
-            let frame = ctx.get_frame_filter(n, &d.node);
+                    for _ in 0..h {
+                        for x in 0..w as usize {
+                            unsafe { *dst_p.wrapping_add(x) = !*src_p.wrapping_add(x) };
+                        }
 
-            // TODO: do something with the frame
-            core.log(ffi::VSMessageType::mtInformation, cstr!("Hello, world"));
-
-            return frame.as_ptr();
+                        src_p = src_p.wrapping_offset(src_stride);
+                        dst_p = dst_p.wrapping_offset(dst_stride);
+                    }
+                }
+                return Ok(Some(dst));
+            }
+            _ => {}
         }
-        r::arError => (api.setFilterError)(cstr!("Error").as_ptr(), frame_ctx),
+
+        Ok(None)
     }
-
-    null()
-}
-
-/// # Safety
-pub unsafe extern "system" fn filter_free(
-    instance_data: *mut c_void,
-    core: *mut ffi::VSCore,
-    vsapi: *const ffi::VSAPI,
-) {
-    // _ = Box::from_raw(instance_data as *mut DumbFilter);
 }
 
 /// # Safety
 pub unsafe extern "system" fn filter_create(
     in_: *const ffi::VSMap,
     out: *mut ffi::VSMap,
-    user_data: *mut c_void,
+    _user_data: *mut c_void,
     core: *mut ffi::VSCore,
     vsapi: *const ffi::VSAPI,
 ) {
     let api = ApiRef::from_raw(vsapi);
     api.set().expect("API already set");
     let in_ = MapRef::from_ptr(in_);
+    let mut out = MapMut::from_ptr(out);
+    let mut core = CoreRef::from_ptr(core);
 
-    if let Err(e) = std::panic::catch_unwind(|| {
-        let mut out = MapMut::from_ptr(out);
-        let mut core = CoreRef::from_ptr(core);
-
+    if let Err(e) = std::panic::catch_unwind(move || {
         let node = match in_.get(key!("clip"), 0) {
             Ok(Value::VideoNode(node)) => node,
             _ => {
-                out.set_error(cstr!("Failed to get node\n"));
-                return;
+                panic!("Failed to get node");
             }
         };
+        let vi = node.get_video_info();
+        if !isConstantVideoFormat(&*vi)
+            || (*vi).format.sampleType != ffi::VSSampleType::stInteger
+            || (*vi).format.bitsPerSample != 8
+        {
+            panic!("Invert: only constant format 8bit integer input supported");
+        }
 
-        let mut filter = Box::new(DumbFilter { node: node.clone() });
+        let mut filter = DumbFilter {
+            node,
+            enabled: in_
+                .get_int(key!("enabled"), 0)
+                .map(|v| v != 0)
+                .unwrap_or(true),
+        };
 
         let deps = [ffi::VSFilterDependency {
             source: filter.node.as_mut_ptr(),
-            requestPattern: ffi::VSRequestPattern::rpGeneral,
+            requestPattern: ffi::VSRequestPattern::rpStrictSpatial,
         }];
-        let info = filter.node.get_video_info().clone();
 
-        core.create_video_filter(out, "Filter", &info, filter, &deps)
-            .unwrap();
+        if let Err(e) = core.create_video_filter(out, "Invert", &*vi, Box::new(filter), &deps) {
+            out.set_error(&e.to_string().into_cstring_lossy());
+        }
     }) {
-        let msg = CString::from_vec_unchecked(
-            format!("{:?}", e.downcast_ref::<&str>().unwrap_unchecked()).into(),
-        );
-        MapMut::from_ptr(out).set_error(&msg);
+        let msg = e.downcast::<&str>().unwrap_unchecked().into_cstring_lossy();
+        out.set_error(&msg);
     }
 }
 
@@ -123,9 +130,9 @@ pub unsafe extern "system" fn VapourSynthPluginInit2(
     vspapi: *const ffi::VSPLUGINAPI,
 ) {
     ((*vspapi).configPlugin)(
-        cstr!("com.example.filter").as_ptr(),
-        cstr!("filter").as_ptr(),
-        cstr!("VapourSynth Filter Skeleton").as_ptr(),
+        cstr!("com.example.invert").as_ptr(),
+        cstr!("invert").as_ptr(),
+        cstr!("VapourSynth Invert Example").as_ptr(),
         ffi::VS_MAKE_VERSION(1, 0),
         ffi::VAPOURSYNTH_API_VERSION,
         0,
@@ -134,7 +141,7 @@ pub unsafe extern "system" fn VapourSynthPluginInit2(
 
     ((*vspapi).registerFunction)(
         cstr!("Filter").as_ptr(),
-        cstr!("clip:vnode;").as_ptr(),
+        cstr!("clip:vnode;enabled:int:opt;").as_ptr(),
         cstr!("clip:vnode;").as_ptr(),
         filter_create,
         null_mut(),

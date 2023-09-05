@@ -1,6 +1,6 @@
 use std::{ffi::CStr, ptr::NonNull};
 
-use crate::{api, ffi, FrameRef, NodeRef};
+use crate::{api, ffi, Frame, NodeRef};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
@@ -27,9 +27,9 @@ impl FrameContext {
     }
 
     #[must_use]
-    pub fn get_frame_filter(&mut self, n: i32, node: &NodeRef) -> FrameRef {
+    pub fn get_frame_filter(&mut self, n: i32, node: &NodeRef) -> Frame {
         unsafe {
-            FrameRef::from_ptr((api().getFrameFilter)(
+            Frame::from_ptr((api().getFrameFilter)(
                 n,
                 node.as_ptr().cast_mut(),
                 self.as_mut_ptr(),
@@ -49,7 +49,7 @@ impl FrameContext {
         }
     }
 
-    pub fn cache_frame(&mut self, frame: &FrameRef, n: i32) {
+    pub fn cache_frame(&mut self, frame: &Frame, n: i32) {
         unsafe {
             (api().cacheFrame)(frame.as_ptr(), n, self.as_mut_ptr());
         }

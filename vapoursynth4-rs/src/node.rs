@@ -5,11 +5,16 @@
 */
 
 use std::{
-    ffi::{CStr, CString},
-    ptr::NonNull,
+    ffi::{c_int, c_void, CStr, CString},
+    mem::ManuallyDrop,
+    panic::AssertUnwindSafe,
+    ptr::{null, NonNull},
 };
 
-use crate::{api, ffi, AudioInfo, Core, FrameRef, MediaType, VideoInfo};
+use crate::{
+    api, ffi, utils::ToCString, ApiRef, AudioInfo, Core, CoreRef, Frame, FrameContext, MediaType,
+    VideoInfo,
+};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum Info<'n> {
@@ -50,26 +55,26 @@ impl NodeRef {
     ///
     /// The node must be a video node, otherwise the behaviour is undefined.
     #[must_use]
-    pub unsafe fn get_video_info(&self) -> &VideoInfo {
+    pub unsafe fn get_video_info(&self) -> *const VideoInfo {
         // `vi` is cpp reference internally (so it's always valid)
-        &*(api().getVideoInfo)(self.as_ptr().cast_mut())
+        (api().getVideoInfo)(self.as_ptr().cast_mut())
     }
 
     /// # Safety
     ///
     /// The node must be an audio node, otherwise the behaviour is undefined.
     #[must_use]
-    pub unsafe fn get_audio_info(&self) -> &AudioInfo {
+    pub unsafe fn get_audio_info(&self) -> *const AudioInfo {
         // `ai` is cpp reference internally (so it's always valid)
-        &*(api().getAudioInfo)(self.as_ptr().cast_mut())
+        (api().getAudioInfo)(self.as_ptr().cast_mut())
     }
 
     #[must_use]
     pub fn get_info(&self) -> Info {
         // Safety: `self.handle` is a valid pointer, and the type is correct
         match self.get_type() {
-            MediaType::Video => Info::Video(unsafe { self.get_video_info() }),
-            MediaType::Audio => Info::Audio(unsafe { self.get_audio_info() }),
+            MediaType::Video => Info::Video(unsafe { &*self.get_video_info() }),
+            MediaType::Audio => Info::Audio(unsafe { &*self.get_audio_info() }),
         }
     }
 
@@ -79,21 +84,22 @@ impl NodeRef {
     pub fn new_video<F: Filter>(
         name: &str,
         info: &VideoInfo,
-        filter: &mut F,
+        filter: F,
         dependencies: &[ffi::VSFilterDependency],
         core: &mut Core,
     ) -> Option<Self> {
+        let mut filter = Box::new(filter);
         let name = CString::new(name).ok()?;
         let node = unsafe {
             (api().createVideoFilter2)(
                 name.as_ptr(),
                 info,
-                filter.get_frame(),
-                filter.free(),
-                filter.filter_mode().into(),
+                F::filter_get_frame,
+                Some(F::filter_free),
+                F::FILTER_MODE.into(),
                 dependencies.as_ptr(),
                 dependencies.len().try_into().unwrap(),
-                (filter.instance_data() as *mut F::InstanceData).cast(),
+                Box::into_raw(filter).cast(),
                 core.as_mut_ptr(),
             )
         };
@@ -111,21 +117,22 @@ impl NodeRef {
     pub fn new_audio<F: Filter>(
         name: &str,
         info: &AudioInfo,
-        filter: &mut F,
+        filter: F,
         dependencies: &[ffi::VSFilterDependency],
         core: &mut Core,
     ) -> Option<Self> {
+        let mut filter = Box::new(filter);
         let name = CString::new(name).ok()?;
         let node = unsafe {
             (api().createAudioFilter2)(
                 name.as_ptr(),
                 info,
-                filter.get_frame(),
-                filter.free(),
-                filter.filter_mode().into(),
+                F::filter_get_frame,
+                Some(F::filter_free),
+                F::FILTER_MODE.into(),
                 dependencies.as_ptr(),
                 dependencies.len().try_into().unwrap(),
-                (filter.instance_data() as *mut F::InstanceData).cast(),
+                Box::into_raw(filter).cast(),
                 core.as_mut_ptr(),
             )
         };
@@ -151,7 +158,7 @@ impl NodeRef {
         }
     }
 
-    pub fn get_frame(&self, n: i32) -> Result<FrameRef, String> {
+    pub fn get_frame(&self, n: i32) -> Result<Frame, String> {
         let mut buf = vec![0; 1024];
         let ptr = unsafe { (api().getFrame)(n, self.as_ptr().cast_mut(), buf.as_mut_ptr(), 1024) };
 
@@ -161,14 +168,14 @@ impl NodeRef {
                 .to_string_lossy()
                 .into_owned())
         } else {
-            unsafe { Ok(FrameRef::from_ptr(ptr)) }
+            unsafe { Ok(Frame::from_ptr(ptr)) }
         }
     }
 
     // TODO: Find a better way to handle callbacks
     pub fn get_frame_async<D, F>(&self, _n: i32, _data: &mut D)
     where
-        F: Fn(D, FrameRef, i32) -> Result<(), String>,
+        F: Fn(D, Frame, i32) -> Result<(), String>,
     {
         todo!()
     }
@@ -252,31 +259,74 @@ impl From<CacheMode> for ffi::VSCacheMode {
     }
 }
 
-pub trait Filter {
-    type InstanceData;
+pub trait Filter
+where
+    Self: Sized + std::panic::RefUnwindSafe,
+{
+    type Error: AsRef<CStr>;
+    const FILTER_MODE: FilterMode = FilterMode::Parallel;
 
-    fn get_frame(&self) -> ffi::VSFilterGetFrame;
-    fn free(&self) -> ffi::VSFilterFree;
-    fn filter_mode(&self) -> FilterMode;
-    fn instance_data(&mut self) -> *mut Self::InstanceData;
+    fn get_frame(
+        &self,
+        n: i32,
+        activation_reason: ffi::VSActivationReason,
+        frame_data: *mut *mut c_void,
+        frame_ctx: FrameContext,
+        core: CoreRef,
+    ) -> Result<Option<Frame>, Self::Error>;
+    fn free(self, core: CoreRef) {}
 }
 
-impl<T: Filter + ?Sized> Filter for Box<T> {
-    type InstanceData = T::InstanceData;
+pub(crate) trait FilterExtern: Filter {
+    unsafe extern "system" fn filter_get_frame(
+        n: c_int,
+        activation_reason: ffi::VSActivationReason,
+        instance_data: *mut c_void,
+        frame_data: *mut *mut c_void,
+        frame_ctx: *mut ffi::VSFrameContext,
+        core: *mut ffi::VSCore,
+        vsapi: *const ffi::VSAPI,
+    ) -> *const ffi::VSFrame {
+        let filter = instance_data.cast::<Self>().as_mut().unwrap_unchecked();
+        let mut ctx = AssertUnwindSafe(FrameContext::from_ptr(frame_ctx));
+        let core = CoreRef::from_ptr(core);
+        let api = ApiRef::from_raw(vsapi);
+        _ = api.set();
 
-    fn get_frame(&self) -> ffi::VSFilterGetFrame {
-        (**self).get_frame()
+        match std::panic::catch_unwind(|| {
+            let mut ctx = *ctx;
+            filter.get_frame(n, activation_reason, frame_data, ctx, core)
+        }) {
+            Ok(Ok(Some(frame))) => {
+                // Transfer the ownership to VapourSynth
+                let frame = ManuallyDrop::new(frame);
+                return frame.as_ptr();
+            }
+            Ok(Err(e)) => {
+                ctx.set_filter_error(e.as_ref());
+            }
+            Err(p) => {
+                let e = p.downcast::<&str>().unwrap_unchecked();
+                ctx.set_filter_error(&e.into_cstring_lossy());
+            }
+            _ => {}
+        }
+
+        null()
     }
 
-    fn free(&self) -> ffi::VSFilterFree {
-        (**self).free()
-    }
+    unsafe extern "system" fn filter_free(
+        instance_data: *mut c_void,
+        core: *mut ffi::VSCore,
+        vsapi: *const ffi::VSAPI,
+    ) {
+        let filter = Box::from_raw(instance_data.cast::<Self>());
+        let core = CoreRef::from_ptr(core);
+        let api = ApiRef::from_raw(vsapi);
+        _ = api.set();
 
-    fn filter_mode(&self) -> FilterMode {
-        (**self).filter_mode()
-    }
-
-    fn instance_data(&mut self) -> *mut Self::InstanceData {
-        (**self).instance_data()
+        filter.free(core)
     }
 }
+
+impl<F> FilterExtern for F where F: Filter {}
