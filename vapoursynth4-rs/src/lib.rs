@@ -6,17 +6,15 @@
 
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
-#![allow(warnings)]
 
 mod api;
 mod constants;
 mod core;
-pub mod error;
 mod frame;
 mod function;
-pub mod map;
+mod map;
 mod node;
-pub mod plugin;
+mod plugin;
 mod utils;
 
 pub use crate::core::*;
@@ -26,6 +24,11 @@ pub use frame::*;
 pub use function::*;
 pub use map::*;
 pub use node::*;
+pub use plugin::*;
 pub use utils::*;
 
 use vapoursynth4_sys as ffi;
+
+mod _private {
+    pub trait Sealed {}
+}

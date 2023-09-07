@@ -1,6 +1,6 @@
 use std::{ffi::CStr, ptr::NonNull};
 
-use crate::{api, ffi, Frame, NodeRef};
+use crate::{api, ffi, AudioFrame, Frame, Node, VideoFrame, VideoNode};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
@@ -26,30 +26,19 @@ impl FrameContext {
         self.handle.as_ptr()
     }
 
-    #[must_use]
-    pub fn get_frame_filter(&mut self, n: i32, node: &NodeRef) -> Frame {
-        unsafe {
-            Frame::from_ptr((api().getFrameFilter)(
-                n,
-                node.as_ptr().cast_mut(),
-                self.as_mut_ptr(),
-            ))
-        }
-    }
-
-    pub fn request_frame_filter(&mut self, n: i32, node: &NodeRef) {
+    pub fn request_frame_filter(&mut self, n: i32, node: &VideoNode) {
         unsafe {
             (api().requestFrameFilter)(n, node.as_ptr().cast_mut(), self.as_mut_ptr());
         }
     }
 
-    pub fn release_frame_early(&mut self, n: i32, node: &NodeRef) {
+    pub fn release_frame_early(&mut self, n: i32, node: &VideoNode) {
         unsafe {
             (api().releaseFrameEarly)(node.as_ptr().cast_mut(), n, self.as_mut_ptr());
         }
     }
 
-    pub fn cache_frame(&mut self, frame: &Frame, n: i32) {
+    pub fn cache_frame(&mut self, frame: &impl Frame, n: i32) {
         unsafe {
             (api().cacheFrame)(frame.as_ptr(), n, self.as_mut_ptr());
         }

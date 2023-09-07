@@ -4,11 +4,11 @@ use crate::{api, ffi, Map};
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
-pub struct FunctionRef {
+pub struct Function {
     handle: NonNull<ffi::VSFunction>,
 }
 
-impl FunctionRef {
+impl Function {
     pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSFunction) -> Self {
         Self {
             handle: NonNull::new_unchecked(ptr),
@@ -27,13 +27,13 @@ impl FunctionRef {
     }
 }
 
-impl Drop for FunctionRef {
+impl Drop for Function {
     fn drop(&mut self) {
         unsafe { (api().freeFunction)(self.as_ptr()) }
     }
 }
 
-impl Clone for FunctionRef {
+impl Clone for Function {
     fn clone(&self) -> Self {
         unsafe { Self::from_ptr((api().addFunctionRef)(self.as_ptr())) }
     }
