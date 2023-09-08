@@ -18,7 +18,7 @@ pub mod utils;
 
 pub use api::*;
 
-use vapoursynth4_sys as ffi;
+pub use vapoursynth4_sys as ffi;
 
 mod _private {
     pub trait Sealed {}
@@ -29,3 +29,5 @@ pub type SampleType = ffi::VSSampleType;
 
 pub type VideoInfo = ffi::VSVideoInfo;
 pub type AudioInfo = ffi::VSAudioInfo;
+
+pub use ffi::VAPOURSYNTH_API_VERSION;

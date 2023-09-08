@@ -9,6 +9,5 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-vapoursynth4-rs = {version = "0.1.0", path = "../vapoursynth4-rs"}
-vapoursynth4-sys = {version = "0.1.0", path = "../vapoursynth4-sys"}
+vapoursynth4-rs = {version = "0.2.0", path = "../vapoursynth4-rs"}
 const-str = "0.5.6"

@@ -54,15 +54,16 @@ pub trait Node: Sized + crate::_private::Sealed {
         }
     }
 
-    fn get_frame(&self, n: i32) -> Result<Self::FrameType, String> {
+    /// # Errors
+    ///
+    /// Return the internal error message if the frame is not ready.
+    fn get_frame(&self, n: i32) -> Result<Self::FrameType, CString> {
         let mut buf = vec![0; 1024];
         let ptr = unsafe { (api().getFrame)(n, self.as_ptr().cast_mut(), buf.as_mut_ptr(), 1024) };
 
         if ptr.is_null() {
             let mut buf = std::mem::ManuallyDrop::new(buf);
-            Err(unsafe { CStr::from_ptr(buf.as_mut_ptr()) }
-                .to_string_lossy()
-                .into_owned())
+            Err(unsafe { CStr::from_ptr(buf.as_mut_ptr()).into() })
         } else {
             unsafe { Ok(Self::FrameType::from_ptr(ptr)) }
         }
@@ -136,7 +137,7 @@ impl VideoNode {
                 info,
                 F::filter_get_frame,
                 Some(F::filter_free),
-                F::FILTER_MODE.into(),
+                F::FILTER_MODE,
                 dependencies.as_ptr(),
                 dependencies.len().try_into().unwrap(),
                 Box::into_raw(filter).cast(),
@@ -215,7 +216,7 @@ impl AudioNode {
                 info,
                 F::filter_get_frame,
                 Some(F::filter_free),
-                F::FILTER_MODE.into(),
+                F::FILTER_MODE,
                 dependencies.as_ptr(),
                 dependencies.len().try_into().unwrap(),
                 Box::into_raw(filter).cast(),

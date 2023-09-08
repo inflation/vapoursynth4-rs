@@ -14,7 +14,7 @@ pub struct FrameContext {
 
 impl FrameContext {
     #[must_use]
-    pub unsafe fn from_ptr(ptr: *const ffi::VSFrameContext) -> FrameContext {
+    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSFrameContext) -> FrameContext {
         FrameContext {
             handle: NonNull::new_unchecked(ptr.cast_mut()),
         }

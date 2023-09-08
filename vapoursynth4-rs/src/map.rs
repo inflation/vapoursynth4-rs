@@ -73,7 +73,7 @@ impl<'m> MapRef<'m> {
     }
 
     #[must_use]
-    pub unsafe fn from_ptr(ptr: *const ffi::VSMap) -> MapRef<'m> {
+    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSMap) -> MapRef<'m> {
         MapRef {
             handle: NonNull::new_unchecked(ptr.cast_mut()),
             _marker: PhantomData,
@@ -438,15 +438,15 @@ impl Map {
     ) -> Result<(), MapPropertyError> {
         unsafe {
             match val {
-                Value::Int(val) => self._set(api().mapSetInt, key, val, append.into()),
-                Value::Float(val) => self._set(api().mapSetFloat, key, val, append.into()),
+                Value::Int(val) => self._set(api().mapSetInt, key, val, append),
+                Value::Float(val) => self._set(api().mapSetFloat, key, val, append),
                 Value::Data(val) => handle_set_error((api().mapSetData)(
                     self.as_mut_ptr(),
                     key.as_ptr(),
                     val.as_ptr().cast(),
                     val.len().try_into().unwrap(),
                     ffi::VSDataTypeHint::Binary,
-                    append.into(),
+                    append,
                 )),
                 Value::Utf8(val) => handle_set_error((api().mapSetData)(
                     self.as_mut_ptr(),
@@ -454,29 +454,17 @@ impl Map {
                     val.as_ptr().cast(),
                     val.len().try_into().unwrap(),
                     ffi::VSDataTypeHint::Utf8,
-                    append.into(),
+                    append,
                 )),
-                Value::VideoNode(val) => self._set(
-                    api().mapSetNode,
-                    key,
-                    val.as_ptr().cast_mut(),
-                    append.into(),
-                ),
-                Value::AudioNode(val) => self._set(
-                    api().mapSetNode,
-                    key,
-                    val.as_ptr().cast_mut(),
-                    append.into(),
-                ),
-                Value::VideoFrame(val) => {
-                    self._set(api().mapSetFrame, key, val.as_ptr(), append.into())
+                Value::VideoNode(val) => {
+                    self._set(api().mapSetNode, key, val.as_ptr().cast_mut(), append)
                 }
-                Value::AudioFrame(val) => {
-                    self._set(api().mapSetFrame, key, val.as_ptr(), append.into())
+                Value::AudioNode(val) => {
+                    self._set(api().mapSetNode, key, val.as_ptr().cast_mut(), append)
                 }
-                Value::Function(val) => {
-                    self._set(api().mapSetFunction, key, val.as_ptr(), append.into())
-                }
+                Value::VideoFrame(val) => self._set(api().mapSetFrame, key, val.as_ptr(), append),
+                Value::AudioFrame(val) => self._set(api().mapSetFrame, key, val.as_ptr(), append),
+                Value::Function(val) => self._set(api().mapSetFunction, key, val.as_ptr(), append),
             }
         }
     }
@@ -532,7 +520,7 @@ impl Map {
                 self.as_mut_ptr(),
                 key.as_ptr(),
                 node.as_mut_ptr(),
-                append.into(),
+                append,
             ))
         }
     }
@@ -552,7 +540,7 @@ impl Map {
                 self.as_mut_ptr(),
                 key.as_ptr(),
                 frame.as_ptr(),
-                append.into(),
+                append,
             ))
         }
     }
@@ -572,7 +560,7 @@ impl Map {
                 self.as_mut_ptr(),
                 key.as_ptr(),
                 function.as_ptr(),
-                append.into(),
+                append,
             ))
         }
     }

@@ -42,7 +42,7 @@ pub trait Frame: Sized + internal::FrameFromPtr {
 }
 
 pub(crate) mod internal {
-    use super::*;
+    use super::ffi;
 
     pub trait FrameFromPtr {
         unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self;
@@ -108,7 +108,7 @@ impl VideoFrame {
 
     #[must_use]
     pub fn get_type(&self) -> MediaType {
-        unsafe { (api().getFrameType)(self.as_ptr()).into() }
+        unsafe { (api().getFrameType)(self.as_ptr()) }
     }
 
     #[must_use]

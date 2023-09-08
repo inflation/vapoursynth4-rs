@@ -177,3 +177,32 @@ impl Iterator for Functions<'_> {
         }
     }
 }
+
+#[macro_export]
+macro_rules! declare_plugin {
+    ($id:literal, $name:literal, $desc:literal,
+        $version:expr,
+        $api_version:expr, $flags:expr
+        $(, ($filter:tt, $data:expr) )*
+    ) => {
+        #[no_mangle]
+        pub unsafe extern "system" fn VapourSynthPluginInit2(
+            plugin: *mut $crate::ffi::VSPlugin,
+            vspapi: *const $crate::ffi::VSPLUGINAPI,
+        ) {
+            ((*vspapi).configPlugin)(
+                cstr!($id).as_ptr(),
+                cstr!($name).as_ptr(),
+                cstr!($desc).as_ptr(),
+                $crate::utils::make_version($version.0, $version.1),
+                $crate::VAPOURSYNTH_API_VERSION,
+                $flags,
+                plugin,
+            );
+
+            $(
+                $crate::node::FilterRegister::<$filter>::new($data).register(plugin, vspapi);
+            )*
+        }
+    };
+}

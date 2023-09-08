@@ -1,8 +1,8 @@
 [package]
 name = "vapoursynth4-sys"
 edition = "2021"
-version = "0.1.0"
-authors = ["Xanthophobia <me@shimotsuki.ink>"]
+version = "0.2.0"
+authors = ["Inflation <me@shimotsuki.ink>"]
 description = "Rust bindings for VapourSynth and VSScript API version 4"
 license = "MPL-2.0"
 

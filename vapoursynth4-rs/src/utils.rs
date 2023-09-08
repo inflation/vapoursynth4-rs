@@ -17,6 +17,10 @@ impl ToCString for &str {
     }
 }
 
+pub use crate::ffi::vs_make_version as make_version;
+
+pub use crate::ffi::helper::*;
+
 // Ideas come from:
 // https://docs.rs/const-str/latest/src/const_str/__ctfe/cstr.rs.html
 #[doc(hidden)]

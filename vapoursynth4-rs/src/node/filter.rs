@@ -2,7 +2,7 @@ use std::{
     ffi::{c_int, c_void, CStr},
     mem::ManuallyDrop,
     panic::AssertUnwindSafe,
-    ptr::null,
+    ptr::{null, null_mut},
 };
 
 use crate::{
@@ -20,20 +20,30 @@ where
     Self: Sized + std::panic::RefUnwindSafe,
 {
     const FILTER_MODE: FilterMode = FilterMode::Parallel;
+    /// Filter error that can turned into a [`&CStr`](std::ffi::CStr)
     type Error: AsRef<CStr>;
     type FrameType: Frame;
     type FilterData;
 
-    fn name() -> &'static CStr;
-    fn args() -> &'static CStr;
-    fn return_type() -> &'static CStr;
+    const NAME: &'static CStr;
+    const ARGS: &'static CStr;
+    const RETURN_TYPE: &'static CStr;
 
-    fn create<T>(
+    /// # Errors
+    ///
+    /// Return [`Self::Error`] if anything happens during the filter creation.
+    /// The error message will be passed to `VapourSynth`.
+    fn create(
         input: MapRef<'_>,
         output: MapMut<'_>,
-        data: Option<&mut T>,
+        data: Option<Box<Self::FilterData>>,
         core: CoreRef,
     ) -> Result<(), Self::Error>;
+
+    /// # Errors
+    ///
+    /// Return [`Self::Error`] if anything happens during the filter creation.
+    /// The error message will be passed to `VapourSynth`.
     fn get_frame(
         &self,
         n: i32,
@@ -43,28 +53,39 @@ where
         core: CoreRef,
     ) -> Result<Option<Self::FrameType>, Self::Error>;
     fn free(self, _core: CoreRef) {}
+}
+
+pub struct FilterRegister<F: Filter> {
+    data: Option<F::FilterData>,
+}
+
+impl<F: Filter> FilterRegister<F> {
+    pub fn new(data: Option<F::FilterData>) -> Self {
+        Self { data }
+    }
 
     /// # Safety
-    unsafe fn register(
-        data: Option<Self::FilterData>,
-        plugin: *mut ffi::VSPlugin,
-        vspapi: *const ffi::VSPLUGINAPI,
-    ) {
+    #[doc(hidden)]
+    pub unsafe fn register(self, plugin: *mut ffi::VSPlugin, vspapi: *const ffi::VSPLUGINAPI) {
         use self::internal::FilterExtern;
 
         ((*vspapi).registerFunction)(
-            Self::name().as_ptr(),
-            Self::args().as_ptr(),
-            Self::return_type().as_ptr(),
-            Self::filter_create,
-            Box::into_raw(Box::new(data)).cast(),
+            F::NAME.as_ptr(),
+            F::ARGS.as_ptr(),
+            F::RETURN_TYPE.as_ptr(),
+            F::filter_create,
+            self.data
+                .map_or(null_mut(), |d| Box::into_raw(Box::new(d)).cast()),
             plugin,
         );
     }
 }
 
 pub(crate) mod internal {
-    use super::*;
+    use super::{
+        c_int, c_void, ffi, null, set_api_from_raw, AssertUnwindSafe, CoreRef, Filter, Frame,
+        FrameContext, ManuallyDrop, MapMut, MapRef, ToCString,
+    };
 
     pub trait FilterExtern: Filter {
         unsafe extern "system" fn filter_create(
@@ -79,7 +100,11 @@ pub(crate) mod internal {
             let input = MapRef::from_ptr(in_);
             let mut output = MapMut::from_ptr(out);
             let core = CoreRef::from_ptr(core);
-            let data = user_data.as_mut();
+            let data = if user_data.is_null() {
+                None
+            } else {
+                Some(Box::from_raw(user_data.cast()))
+            };
 
             match std::panic::catch_unwind(AssertUnwindSafe(|| {
                 Self::create(input, output, data, core)
