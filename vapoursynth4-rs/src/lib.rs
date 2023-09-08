@@ -8,27 +8,24 @@
 #![allow(clippy::module_name_repetitions)]
 
 mod api;
-mod constants;
-mod core;
-mod frame;
-mod function;
-mod map;
-mod node;
-mod plugin;
-mod utils;
+pub mod core;
+pub mod frame;
+pub mod function;
+pub mod map;
+pub mod node;
+pub mod plugin;
+pub mod utils;
 
-pub use crate::core::*;
 pub use api::*;
-pub use constants::*;
-pub use frame::*;
-pub use function::*;
-pub use map::*;
-pub use node::*;
-pub use plugin::*;
-pub use utils::*;
 
 use vapoursynth4_sys as ffi;
 
 mod _private {
     pub trait Sealed {}
 }
+
+pub type ColorFamily = ffi::VSColorFamily;
+pub type SampleType = ffi::VSSampleType;
+
+pub type VideoInfo = ffi::VSVideoInfo;
+pub type AudioInfo = ffi::VSAudioInfo;

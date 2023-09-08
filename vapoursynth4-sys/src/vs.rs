@@ -10,8 +10,12 @@
 //!
 //! `VapourSynth`'s public API is all C.
 
+// #![allow(non_upper_case_globals)]
+#![allow(clippy::enum_glob_use)]
+
 use std::ffi::*;
 
+use super::opaque_struct;
 use super::*;
 
 /// Major API version.
@@ -22,7 +26,7 @@ pub const VAPOURSYNTH_API_MINOR: u16 = 0;
 /// API version. The high 16 bits are [`VAPOURSYNTH_API_MAJOR`], the low 16 bits are
 /// [`VAPOURSYNTH_API_MINOR`].
 pub const VAPOURSYNTH_API_VERSION: i32 =
-    VS_MAKE_VERSION(VAPOURSYNTH_API_MAJOR, VAPOURSYNTH_API_MINOR);
+    vs_make_version(VAPOURSYNTH_API_MAJOR, VAPOURSYNTH_API_MINOR);
 
 /// The number of audio samples in an audio frame. It is a static number to
 /// make it possible to calculate which audio frames are needed to retrieve specific samples.
@@ -54,7 +58,7 @@ opaque_struct!(
     ///
     /// A [`VSPlugin`] instance is constructed by the core when loading a plugin
     /// (.so / .dylib / .dll), and the pointer is passed to the plugin's
-    /// [`VapourSynthPluginInit2()`] function.
+    /// `VapourSynthPluginInit2()` function.
     ///
     /// A VapourSynth plugin can export any number of filters.
     ///
@@ -122,31 +126,31 @@ opaque_struct!(
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSColorFamily {
-    cfUndefined = 0,
-    cfGray = 1,
-    cfRGB = 2,
-    cfYUV = 3,
+    Undefined = 0,
+    Gray = 1,
+    RGB = 2,
+    YUV = 3,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSSampleType {
-    stInteger = 0,
-    stFloat = 1,
+    Integer = 0,
+    Float = 1,
 }
 
-const fn VS_MAKE_VIDEO_ID(
-    colorFamily: VSColorFamily,
-    sampleType: VSSampleType,
-    bitsPerSample: isize,
-    subSamplingW: isize,
-    subSamplingH: isize,
+const fn vs_make_video_id(
+    color_family: VSColorFamily,
+    sample_type: VSSampleType,
+    bits_per_sample: isize,
+    sub_sampling_w: isize,
+    sub_sampling_h: isize,
 ) -> isize {
-    ((colorFamily as isize) << 28)
-        | ((sampleType as isize) << 24)
-        | (bitsPerSample << 16)
-        | (subSamplingW << 8)
-        | subSamplingH
+    ((color_family as isize) << 28)
+        | ((sample_type as isize) << 24)
+        | (bits_per_sample << 16)
+        | (sub_sampling_w << 8)
+        | sub_sampling_h
 }
 
 use VSColorFamily::*;
@@ -158,59 +162,59 @@ use VSSampleType::*;
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSPresetVideoFormat {
-    pfNone = 0,
+    None = 0,
 
-    pfGray8 = VS_MAKE_VIDEO_ID(cfGray, stInteger, 8, 0, 0),
-    pfGray9 = VS_MAKE_VIDEO_ID(cfGray, stInteger, 9, 0, 0),
-    pfGray10 = VS_MAKE_VIDEO_ID(cfGray, stInteger, 10, 0, 0),
-    pfGray12 = VS_MAKE_VIDEO_ID(cfGray, stInteger, 12, 0, 0),
-    pfGray14 = VS_MAKE_VIDEO_ID(cfGray, stInteger, 14, 0, 0),
-    pfGray16 = VS_MAKE_VIDEO_ID(cfGray, stInteger, 16, 0, 0),
-    pfGray32 = VS_MAKE_VIDEO_ID(cfGray, stInteger, 32, 0, 0),
+    Gray8 = vs_make_video_id(Gray, Integer, 8, 0, 0),
+    Gray9 = vs_make_video_id(Gray, Integer, 9, 0, 0),
+    Gray10 = vs_make_video_id(Gray, Integer, 10, 0, 0),
+    Gray12 = vs_make_video_id(Gray, Integer, 12, 0, 0),
+    Gray14 = vs_make_video_id(Gray, Integer, 14, 0, 0),
+    Gray16 = vs_make_video_id(Gray, Integer, 16, 0, 0),
+    Gray32 = vs_make_video_id(Gray, Integer, 32, 0, 0),
 
-    pfGrayH = VS_MAKE_VIDEO_ID(cfGray, stFloat, 16, 0, 0),
-    pfGrayS = VS_MAKE_VIDEO_ID(cfGray, stFloat, 32, 0, 0),
+    GrayH = vs_make_video_id(Gray, Float, 16, 0, 0),
+    GrayS = vs_make_video_id(Gray, Float, 32, 0, 0),
 
-    pfYUV410P8 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 8, 2, 2),
-    pfYUV411P8 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 8, 2, 0),
-    pfYUV440P8 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 8, 0, 1),
+    YUV410P8 = vs_make_video_id(YUV, Integer, 8, 2, 2),
+    YUV411P8 = vs_make_video_id(YUV, Integer, 8, 2, 0),
+    YUV440P8 = vs_make_video_id(YUV, Integer, 8, 0, 1),
 
-    pfYUV420P8 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 8, 1, 1),
-    pfYUV422P8 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 8, 1, 0),
-    pfYUV444P8 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 8, 0, 0),
+    YUV420P8 = vs_make_video_id(YUV, Integer, 8, 1, 1),
+    YUV422P8 = vs_make_video_id(YUV, Integer, 8, 1, 0),
+    YUV444P8 = vs_make_video_id(YUV, Integer, 8, 0, 0),
 
-    pfYUV420P9 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 9, 1, 1),
-    pfYUV422P9 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 9, 1, 0),
-    pfYUV444P9 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 9, 0, 0),
+    YUV420P9 = vs_make_video_id(YUV, Integer, 9, 1, 1),
+    YUV422P9 = vs_make_video_id(YUV, Integer, 9, 1, 0),
+    YUV444P9 = vs_make_video_id(YUV, Integer, 9, 0, 0),
 
-    pfYUV420P10 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 10, 1, 1),
-    pfYUV422P10 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 10, 1, 0),
-    pfYUV444P10 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 10, 0, 0),
+    YUV420P10 = vs_make_video_id(YUV, Integer, 10, 1, 1),
+    YUV422P10 = vs_make_video_id(YUV, Integer, 10, 1, 0),
+    YUV444P10 = vs_make_video_id(YUV, Integer, 10, 0, 0),
 
-    pfYUV420P12 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 12, 1, 1),
-    pfYUV422P12 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 12, 1, 0),
-    pfYUV444P12 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 12, 0, 0),
+    YUV420P12 = vs_make_video_id(YUV, Integer, 12, 1, 1),
+    YUV422P12 = vs_make_video_id(YUV, Integer, 12, 1, 0),
+    YUV444P12 = vs_make_video_id(YUV, Integer, 12, 0, 0),
 
-    pfYUV420P14 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 14, 1, 1),
-    pfYUV422P14 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 14, 1, 0),
-    pfYUV444P14 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 14, 0, 0),
+    YUV420P14 = vs_make_video_id(YUV, Integer, 14, 1, 1),
+    YUV422P14 = vs_make_video_id(YUV, Integer, 14, 1, 0),
+    YUV444P14 = vs_make_video_id(YUV, Integer, 14, 0, 0),
 
-    pfYUV420P16 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 16, 1, 1),
-    pfYUV422P16 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 16, 1, 0),
-    pfYUV444P16 = VS_MAKE_VIDEO_ID(cfYUV, stInteger, 16, 0, 0),
+    YUV420P16 = vs_make_video_id(YUV, Integer, 16, 1, 1),
+    YUV422P16 = vs_make_video_id(YUV, Integer, 16, 1, 0),
+    YUV444P16 = vs_make_video_id(YUV, Integer, 16, 0, 0),
 
-    pfYUV444PH = VS_MAKE_VIDEO_ID(cfYUV, stFloat, 16, 0, 0),
-    pfYUV444PS = VS_MAKE_VIDEO_ID(cfYUV, stFloat, 32, 0, 0),
+    YUV444PH = vs_make_video_id(YUV, Float, 16, 0, 0),
+    YUV444PS = vs_make_video_id(YUV, Float, 32, 0, 0),
 
-    pfRGB24 = VS_MAKE_VIDEO_ID(cfRGB, stInteger, 8, 0, 0),
-    pfRGB27 = VS_MAKE_VIDEO_ID(cfRGB, stInteger, 9, 0, 0),
-    pfRGB30 = VS_MAKE_VIDEO_ID(cfRGB, stInteger, 10, 0, 0),
-    pfRGB36 = VS_MAKE_VIDEO_ID(cfRGB, stInteger, 12, 0, 0),
-    pfRGB42 = VS_MAKE_VIDEO_ID(cfRGB, stInteger, 14, 0, 0),
-    pfRGB48 = VS_MAKE_VIDEO_ID(cfRGB, stInteger, 16, 0, 0),
+    RGB24 = vs_make_video_id(RGB, Integer, 8, 0, 0),
+    RGB27 = vs_make_video_id(RGB, Integer, 9, 0, 0),
+    RGB30 = vs_make_video_id(RGB, Integer, 10, 0, 0),
+    RGB36 = vs_make_video_id(RGB, Integer, 12, 0, 0),
+    RGB42 = vs_make_video_id(RGB, Integer, 14, 0, 0),
+    RGB48 = vs_make_video_id(RGB, Integer, 16, 0, 0),
 
-    pfRGBH = VS_MAKE_VIDEO_ID(cfRGB, stFloat, 16, 0, 0),
-    pfRGBS = VS_MAKE_VIDEO_ID(cfRGB, stFloat, 32, 0, 0),
+    RGBH = vs_make_video_id(RGB, Float, 16, 0, 0),
+    RGBS = vs_make_video_id(RGB, Float, 32, 0, 0),
 }
 
 /// Controls how a filter will be multithreaded, if at all.
@@ -219,36 +223,36 @@ pub enum VSPresetVideoFormat {
 pub enum VSFilterMode {
     /// Completely parallel execution. Multiple threads will call a filter's "getFrame" function,
     /// to fetch several frames in parallel.
-    fmParallel = 0,
+    Parallel = 0,
     /// For filters that are serial in nature but can request in advance one or more frames
     /// they need. A filter's "getFrame" function will be called from multiple threads at a time
-    /// with activation reason [`VSActivationReason::arInitial`],
+    /// with activation reason [`VSActivationReason::Initial`],
     /// but only one thread will call it with activation reason
-    /// [`VSActivationReason::arAllFramesReady`] at a time.
-    fmParallelRequests = 1,
+    /// [`VSActivationReason::AllFramesReady`] at a time.
+    ParallelRequests = 1,
     /// Only one thread can call the filter's "getFrame" function at a time.
     /// Useful for filters that modify or examine their internal state to
     /// determine which frames to request.
     ///
     /// While the "getFrame" function will only run in one thread at a time,
     /// the calls can happen in any order. For example, it can be called with reason
-    /// [`VSActivationReason::arInitial`] for frame 0, then again with reason
-    /// [`VSActivationReason::arInitial`] for frame 1,
-    /// then with reason [`VSActivationReason::arAllFramesReady`]  for frame 0.
-    fmUnordered = 2,
+    /// [`VSActivationReason::Initial`] for frame 0, then again with reason
+    /// [`VSActivationReason::Initial`] for frame 1,
+    /// then with reason [`VSActivationReason::AllFramesReady`]  for frame 0.
+    Unordered = 2,
     /// For compatibility with other filtering architectures.
     /// *DO NOT USE IN NEW FILTERS*. The filter's "getFrame" function only ever gets called from
-    /// one thread at a time. Unlike [`fmUnordered`](VSFilterMode::fmUnordered),
+    /// one thread at a time. Unlike [`Unordered`](VSFilterMode::Unordered),
     /// only one frame is processed at a time.
-    fmFrameState = 3,
+    FrameState = 3,
 }
 
 /// Used to indicate the type of a [`VSFrame`] or [`VSNode`] object.
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSMediaType {
-    mtVideo = 1,
-    mtAudio = 2,
+    Video = 1,
+    Audio = 2,
 }
 
 /// Describes the format of a clip.
@@ -260,27 +264,27 @@ pub enum VSMediaType {
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct VSVideoFormat {
     /// See [`VSColorFamily`].
-    pub colorFamily: VSColorFamily,
+    pub color_family: VSColorFamily,
     /// See [`VSSampleType`].
-    pub sampleType: VSSampleType,
+    pub sample_type: VSSampleType,
     /// Number of significant bits.
-    pub bitsPerSample: c_int,
+    pub bits_per_sample: c_int,
     /// Number of bytes needed for a sample. This is always a power of 2 and the smallest possible
     /// that can fit the number of bits used per sample.
-    pub bytesPerSample: c_int,
+    pub bytes_per_sample: c_int,
 
     /// log2 subsampling factor, applied to second and third plane
-    pub subSamplingW: c_int,
+    pub sub_sampling_w: c_int,
     /// log2 subsampling factor, applied to second and third plane.
     ///
     /// Convenient numbers that can be used like so:
     /// ```
     /// uv_width = y_width >> subSamplingW;
     /// ```
-    pub subSamplingH: c_int,
+    pub sub_sampling_h: c_int,
 
     /// Number of planes, implicit from colorFamily
-    pub numPlanes: c_int,
+    pub num_planes: c_int,
 }
 
 /// Audio channel positions as an enum. Mirrors the `FFmpeg` audio channel constants
@@ -288,31 +292,31 @@ pub struct VSVideoFormat {
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSAudioChannels {
-    acFrontLeft = 0,
-    acFrontRight = 1,
-    acFrontCenter = 2,
-    acLowFrequency = 3,
-    acBackLeft = 4,
-    acBackRight = 5,
-    acFrontLeftOFCenter = 6,
-    acFrontRightOFCenter = 7,
-    acBackCenter = 8,
-    acSideLeft = 9,
-    acSideRight = 10,
-    acTopCenter = 11,
-    acTopFrontLeft = 12,
-    acTopFrontCenter = 13,
-    acTopFrontRight = 14,
-    acTopBackLeft = 15,
-    acTopBackCenter = 16,
-    acTopBackRight = 17,
-    acStereoLeft = 29,
-    acStereoRight = 30,
-    acWideLeft = 31,
-    acWideRight = 32,
-    acSurroundDirectLeft = 33,
-    acSurroundDirectRight = 34,
-    acLowFrequency2 = 35,
+    FrontLeft = 0,
+    FrontRight = 1,
+    FrontCenter = 2,
+    LowFrequency = 3,
+    BackLeft = 4,
+    BackRight = 5,
+    FrontLeftOFCenter = 6,
+    FrontRightOFCenter = 7,
+    BackCenter = 8,
+    SideLeft = 9,
+    SideRight = 10,
+    TopCenter = 11,
+    TopFrontLeft = 12,
+    TopFrontCenter = 13,
+    TopFrontRight = 14,
+    TopBackLeft = 15,
+    TopBackCenter = 16,
+    TopBackRight = 17,
+    StereoLeft = 29,
+    StereoRight = 30,
+    WideLeft = 31,
+    WideRight = 32,
+    SurroundDirectLeft = 33,
+    SurroundDirectRight = 34,
+    LowFrequency2 = 35,
 }
 
 /// Describes the format of a clip.
@@ -324,33 +328,33 @@ pub enum VSAudioChannels {
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct VSAudioFormat {
     /// See [`VSSampleType`].
-    pub sampleType: VSSampleType,
+    pub sample_type: VSSampleType,
     /// Number of significant bits.
-    pub bitsPerSample: c_int,
+    pub bits_per_sample: c_int,
     /// Number of bytes needed for a sample. This is always a power of 2 and the smallest possible
     /// that can fit the number of bits used per sample, implicit from
-    /// [`channelLayout`](VSAudioFormat::channelLayout).
-    pub bytesPerSample: c_int,
-    /// Number of audio channels, implicit from [`bitsPerSample`](VSAudioFormat::bitsPerSample)
-    pub numChannels: c_int,
+    /// [`VSAudioFormat::channel_layout`].
+    pub bytes_per_sample: c_int,
+    /// Number of audio channels, implicit from [`VSAudioFormat::bits_per_sample`]
+    pub num_channels: c_int,
     /// A bitmask representing the channels present using the constants in 1 left shifted
     /// by the constants in [`VSAudioChannels`].
-    pub channelLayout: u64,
+    pub channel_layout: u64,
 }
 
 /// Types of properties that can be stored in a [`VSMap`].
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSPropertyType {
-    ptUnset = 0,
-    ptInt = 1,
-    ptFloat = 2,
-    ptData = 3,
-    ptFunction = 4,
-    ptVideoNode = 5,
-    ptAudioNode = 6,
-    ptVideoFrame = 7,
-    ptAudioFrame = 8,
+    Unset = 0,
+    Int = 1,
+    Float = 2,
+    Data = 3,
+    Function = 4,
+    VideoNode = 5,
+    AudioNode = 6,
+    VideoFrame = 7,
+    AudioFrame = 8,
 }
 
 /// When a `mapGet*` function fails, it returns one of these in the err parameter.
@@ -359,17 +363,17 @@ pub enum VSPropertyType {
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSMapPropertyError {
-    peSuccess = 0,
+    Success = 0,
     /// The requested key was not found in the map.
-    peUnset = 1,
+    Unset = 1,
     /// The wrong function was used to retrieve the property.
     /// E.g. [`mapGetInt()`](VSAPI::mapGetInt) was used on a property of type
-    /// [`ptFloat`](VSPropertyType::ptFloat).
-    peType = 2,
+    /// [`VSPropertyType::Float`].
+    Type = 2,
     /// The requested index was out of bounds.
-    peIndex = 4,
+    Index = 4,
     /// The map has the error state set.
-    peError = 3,
+    Error = 3,
 }
 
 /// Controls the behaviour of [`mapSetInt()`](VSAPI::mapSetInt) and friends.
@@ -377,9 +381,9 @@ pub enum VSMapPropertyError {
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSMapAppendMode {
     /// All existing values associated with the key will be replaced with the new value.
-    maReplace = 0,
+    Replace = 0,
     /// The new value will be appended to the list of existing values associated with the key.
-    maAppend = 1,
+    Append = 1,
 }
 
 /// Contains information about a [`VSCore`] instance.
@@ -388,39 +392,39 @@ pub enum VSMapAppendMode {
 pub struct VSCoreInfo {
     /// Printable string containing the name of the library, copyright notice,
     /// core and API versions.
-    pub versionString: *const c_char,
+    pub version_string: *const c_char,
     /// Version of the core.
     pub core: c_int,
     /// Version of the API.
     pub api: c_int,
     /// Number of worker threads.
-    pub numThreads: c_int,
+    pub num_threads: c_int,
     /// The framebuffer cache will be allowed to grow up to this size (bytes)
     /// before memory is aggressively reclaimed.
-    pub maxFramebufferSize: i64,
+    pub max_framebuffer_size: i64,
     /// Current size of the framebuffer cache, in bytes.
-    pub usedFramebufferSize: i64,
+    pub used_framebuffer_size: i64,
 }
 
 /// Contains information about a clip.
 #[repr(C)]
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct VSVideoInfo {
-    /// Format of the clip. Will have [`colorFamily`](VSVideoFormat::colorFamily) set to
-    /// [`cfUndefined`] if the format can vary.
+    /// Format of the clip. Will have [`VSVideoFormat::color_family`] set to
+    /// [`VSColorFamily::Undefined`] if the format can vary.
     pub format: VSVideoFormat,
     /// Numerator part of the clip's frame rate. It will be 0 if the frame rate can vary.
     /// Should always be a reduced fraction.
-    pub fpsNum: i64,
+    pub fps_num: i64,
     /// Denominator part of the clip's frame rate. It will be 0 if the frame rate can vary.
     /// Should always be a reduced fraction.
-    pub fpsDen: i64,
+    pub fps_den: i64,
     /// Width of the clip. Both width and height will be 0 if the clip's dimensions can vary.
     pub width: c_int,
     /// Height of the clip. Both width and height will be 0 if the clip's dimensions can vary.
     pub height: c_int,
     /// Length of the clip.
-    pub numFrames: c_int,
+    pub num_frames: c_int,
 }
 
 /// Contains information about a clip.
@@ -430,36 +434,36 @@ pub struct VSAudioInfo {
     /// Format of the clip. Unlike video the audio format can never change.
     pub format: VSAudioFormat,
     /// Sample rate.
-    pub sampleRate: c_int,
+    pub sample_rate: c_int,
     /// Length of the clip in audio samples.
-    pub numSamples: i64,
+    pub num_samples: i64,
     /// Length of the clip in audio frames.
     ///
-    /// The total number of audio frames needed to hold [`numSamples`](Self::numSamples),
-    /// implicit from [`numSamples`](Self::numSamples) when calling
+    /// The total number of audio frames needed to hold [`Self::num_samples`],
+    /// implicit from [`Self::num_samples`] when calling
     /// [`createAudioFilter()`](VSAPI::createAudioFilter)
-    pub numFrames: c_int,
+    pub num_frames: c_int,
 }
 
 /// See [`VSFilterGetFrame`].
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSActivationReason {
-    arInitial = 0,
-    arAllFramesReady = 1,
-    arError = -1,
+    Initial = 0,
+    AllFramesReady = 1,
+    Error = -1,
 }
 
 /// See [`addLogHandler()`](VSAPI::addLogHandler).
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSMessageType {
-    mtDebug = 0,
-    mtInformation = 1,
-    mtWarning = 2,
-    mtCritical = 3,
+    Debug = 0,
+    Information = 1,
+    Warning = 2,
+    Critical = 3,
     /// also terminates the process, should generally not be used by normal filters
-    mtFatal = 4,
+    Fatal = 4,
 }
 
 /// Options when creating a core.
@@ -468,14 +472,14 @@ pub enum VSMessageType {
 pub enum VSCoreCreationFlags {
     /// Required to use the graph inspection api functions.
     /// Increases memory usage due to the extra information stored.
-    ccfEnableGraphInspection = 1,
+    EnableGraphInspection = 1,
     /// Don't autoload any user plugins. Core plugins are always loaded.
-    ccfDisableAutoLoading = 2,
+    DisableAutoLoading = 2,
     /// Don't unload plugin libraries when the core is destroyed.
     /// Due to a small amount of memory leaking every load and unload
     /// (windows feature, not my fault) of a library,
     /// this may help in applications with extreme amount of script reloading.
-    ccfDisableLibraryUnloading = 4,
+    DisableLibraryUnloading = 4,
 }
 
 impl std::ops::BitOr for VSCoreCreationFlags {
@@ -492,7 +496,7 @@ impl std::ops::BitOr for VSCoreCreationFlags {
 pub enum VSPluginConfigFlags {
     /// Allow functions to be added to the plugin object after the plugin loading phase.
     /// Mostly useful for Avisynth compatibility and other foreign plugin loaders.
-    pcModifiable = 1,
+    Modifiable = 1,
 }
 
 impl std::ops::BitOr for VSPluginConfigFlags {
@@ -510,9 +514,9 @@ impl std::ops::BitOr for VSPluginConfigFlags {
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSDataTypeHint {
-    dtUnknown = -1,
-    dtBinary = 0,
-    dtUtf8 = 1,
+    Unknown = -1,
+    Binary = 0,
+    Utf8 = 1,
 }
 
 /// Describes the upstream frame request pattern of a filter.
@@ -521,17 +525,17 @@ pub enum VSDataTypeHint {
 pub enum VSRequestPattern {
     /// Anything goes. Note that filters that may be requesting beyond the end of a
     /// [`VSNode`] length in frames (repeating the last frame) should use
-    /// [`rpGeneral`](VSRequestPattern::rpGeneral) and not any of the other modes.
-    rpGeneral = 0,
+    /// [`VSRequestPattern::General`]) and not any of the other modes.
+    General = 0,
     /// Will only request an input frame at most once if all output frames are requested
     /// exactly one time. This includes filters such as Trim, Reverse, SelectEvery.
-    rpNoFrameReuse = 1,
+    NoFrameReuse = 1,
     /// Only requests frame N to output frame N. The main difference to
-    /// [`rpNoFrameReuse`](VSRequestPattern::rpNoFrameReuse) is that the requested frame
+    /// [`VSRequestPattern::NoFrameReuse`] is that the requested frame
     /// is always fixed and known ahead of time. Filter examples
-    /// Lut, Expr (conditionally, see [`rpGeneral`](VSRequestPattern::rpGeneral) note)
+    /// Lut, Expr (conditionally, see [`VSRequestPattern::General`] note)
     /// and similar.
-    rpStrictSpatial = 2,
+    StrictSpatial = 2,
 }
 
 /// Describes how the output of a node is cached.
@@ -540,11 +544,11 @@ pub enum VSRequestPattern {
 pub enum VSCacheMode {
     /// Cache is enabled or disabled based on the reported request patterns
     /// and number of consumers.
-    cmAuto = -1,
+    Auto = -1,
     /// Never cache anything.
-    cmForceDisable = 0,
+    ForceDisable = 0,
     /// Always use the cache.
-    cmForceEnable = 1,
+    ForceEnable = 1,
 }
 
 /// Core entry point
@@ -622,20 +626,20 @@ pub type VSFreeFunctionData = Option<unsafe extern "system" fn(userData: *mut c_
 ///
 ///     ## Note
 ///
-///     This function is first called with [`VSActivationReason::arInitial`].
+///     This function is first called with [`VSActivationReason::Initial`].
 ///     At this point the function should request the input frames it needs and return `NULL`.
 ///     When one or all of the requested frames are ready, this function is called again with
-///     [`VSActivationReason::arAllFramesReady`].
+///     [`VSActivationReason::AllFramesReady`].
 ///     The function should only return a frame when called with
-///     [`VSActivationReason::arAllFramesReady`].
+///     [`VSActivationReason::AllFramesReady`].
 ///
-///     If a the function is called with [`VSActivationReason::arError`] all processing has
+///     If a the function is called with [`VSActivationReason::Error`] all processing has
 ///     to be aborted and any.
 ///
 /// * `instanceData` - The filter's private instance data.
 /// * `frameData` - Optional private data associated with output frame number `n`.
 ///     It must be deallocated before the last call for the given frame
-///     ([`VSActivationReason::arAllFramesReady`] or error).
+///     ([`VSActivationReason::AllFramesReady`] or error).
 ///
 ///     It points to a `void *[4]` array of memory that may be used freely.
 ///     See filters like Splice and Trim for examples.
@@ -700,7 +704,7 @@ pub type VSFrameDoneCallback = unsafe extern "system" fn(
 ///
 /// * `msgType` - The type of message. One of [`VSMessageType`].
 ///
-///     If `msgType` is [`mtFatal`](VSMessageType::mtFatal),
+///     If `msgType` is [`VSMessageType::Fatal`]),
 ///     `VapourSynth` will call abort() after the message handler returns.
 ///
 /// * `msg` - The message.
@@ -710,14 +714,15 @@ pub type VSLogHandlerFree = Option<unsafe extern "system" fn(userData: *mut c_vo
 // !SECTION
 
 /// This struct is used to access `VapourSynth`'s API when a plugin is initially loaded.
+#[allow(non_snake_case)]
 #[repr(C)]
 pub struct VSPLUGINAPI {
     /// See [`getAPIVersion()`](VSAPI::getAPIVersion) in the struct [`VSAPI`].
     /// Returns [`VAPOURSYNTH_API_VERSION`] of the library
     pub getAPIVersion: unsafe extern "system" fn() -> c_int,
     /// Used to provide information about a plugin when loaded. Must be called exactly once from
-    /// the [`VapourSynthPluginInit2()`] entry point. It is recommended to use the
-    /// [`VS_MAKE_VERSION]` macro when providing the `pluginVersion`.
+    /// the `VapourSynthPluginInit2()` entry point. It is recommended to use the
+    /// [`vs_make_version]` macro when providing the `pluginVersion`.
     /// If you don't know the specific `apiVersion` you actually require simply pass
     /// [`VAPOURSYNTH_API_VERSION`] to match the header version
     /// you're compiling against. The flags consist of values from
@@ -753,11 +758,12 @@ pub struct VSFilterDependency {
     /// The node frames are requested from.
     pub source: *mut VSNode,
     /// A value from [`VSRequestPattern`].
-    pub requestPattern: VSRequestPattern,
+    pub request_pattern: VSRequestPattern,
 }
 
 // SECTION - VSAPI
 /// This giant struct is the way to access `VapourSynth`'s public API.
+#[allow(non_snake_case)]
 #[repr(C)]
 pub struct VSAPI {
     // SECTION - Audio and video filter related including nodes
@@ -1138,7 +1144,7 @@ pub struct VSAPI {
     /// Returns non-zero on success.
     pub getAudioFormatName:
         unsafe extern "system" fn(format: *const VSAudioFormat, buffer: *mut c_char) -> c_int,
-    /// Fills out a [_sic_] [`VSVideoInfo`] struct based on the provided arguments.
+    /// Fills out a \[_sic_\] [`VSVideoInfo`] struct based on the provided arguments.
     /// Validates the arguments before filling out format.
     ///
     /// # Arguments
@@ -1308,7 +1314,7 @@ pub struct VSAPI {
     /// Only use inside a filter's "getFrame" function.
     ///
     /// A filter usually calls this function when its activation reason is
-    /// [`VSActivationReason::arAllFramesReady`].
+    /// [`VSActivationReason::AllFramesReady`].
     /// See [`VSActivationReason`].
     ///
     /// It is safe to retrieve a frame more than once, but each reference needs to be freed.
@@ -1335,7 +1341,7 @@ pub struct VSAPI {
     /// A filter usually calls this function when its activation reason is arInitial.
     /// The requested frame can then be retrieved using
     /// [`getFrameFilter()`](Self::getFrameFilter), when the filter's activation reason is
-    /// [`VSActivationReason::arAllFramesReady`].
+    /// [`VSActivationReason::AllFramesReady`].
     ///
     /// It is best to request frames in ascending order, i.e. n, n+1, n+2, etc.
     ///
@@ -1458,7 +1464,7 @@ pub struct VSAPI {
     pub mapNumElements: unsafe extern "system" fn(map: *const VSMap, key: *const c_char) -> c_int,
     /// Returns a value from [`VSPropertyType`] representing type of elements in the given key.
     /// If there is no such key in the map, the returned value is
-    /// [`ptUnset`](VSPropertyType::ptUnset).
+    /// [`VSPropertyType::Unset`]).
     /// Note that also empty arrays created with mapSetEmpty are typed.
     pub mapGetType:
         unsafe extern "system" fn(map: *const VSMap, key: *const c_char) -> VSPropertyType,
@@ -1485,7 +1491,7 @@ pub struct VSAPI {
     ///     Use [`mapNumElements()`](Self::mapNumElements) to know the total number of elements
     ///     associated with a key.
     ///
-    /// * `error` - One of [`VSMapPropertyError`], [`peSuccess`](VSMapPropertyError::peSuccess)
+    /// * `error` - One of [`VSMapPropertyError`], [`VSMapPropertyError::Success`]
     ///     on success.
     ///
     ///     You may pass `NULL` here, but then any problems encountered while retrieving
@@ -1822,7 +1828,7 @@ pub struct VSAPI {
     // SECTION - Plugin and plugin function related
     /// Function that registers a filter exported by the plugin.
     /// A plugin can export any number of filters. This function may only be called during
-    /// the plugin loading phase unless the [`VSPluginConfigFlags::pcModifiable`] flag was
+    /// the plugin loading phase unless the [`VSPluginConfigFlags::Modifiable`] flag was
     /// set by [`configPlugin`](VSPLUGINAPI::configPlugin).
     ///
     /// # Arguments
@@ -1969,15 +1975,15 @@ pub struct VSAPI {
         plugin: *mut VSPlugin,
     ) -> *mut VSPluginFunction,
     /// Returns the name of the function that was passed to
-    /// [`registerFunction`](Self::registerFunction).
+    /// [`registerFunction()`](Self::registerFunction).
     pub getPluginFunctionName:
         unsafe extern "system" fn(func: *mut VSPluginFunction) -> *const c_char,
     /// Returns the argument string of the function that was passed to
-    /// [`registerFunction`](Self::registerFunction).
+    /// [`registerFunction()`](Self::registerFunction).
     pub getPluginFunctionArguments:
         unsafe extern "system" fn(func: *mut VSPluginFunction) -> *const c_char,
     /// Returns the return type string of the function that was passed to
-    /// [`registerFunction`](Self::registerFunction).
+    /// [`registerFunction()`](Self::registerFunction).
     pub getPluginFunctionReturnType:
         unsafe extern "system" fn(func: *mut VSPluginFunction) -> *const c_char,
     /// Returns the absolute path to the plugin, including the plugin's file name.
@@ -1989,7 +1995,7 @@ pub struct VSAPI {
     pub getPluginPath: unsafe extern "system" fn(plugin: *const VSPlugin) -> *const c_char,
     /// Returns the version of the plugin.
     /// This is the same as the version number passed to
-    /// [`configPlugin`](VSPLUGINAPI::configPlugin).
+    /// [`configPlugin()`](VSPLUGINAPI::configPlugin).
     pub getPluginVersion: unsafe extern "system" fn(plugin: *const VSPlugin) -> c_int,
     /// Invokes a filter.
     ///
@@ -2068,7 +2074,7 @@ pub struct VSAPI {
     /// # Arguments
     /// * `msgType` - The type of message. One of [`VSMessageType`].
     ///
-    ///     If `msgType` is [`mtFatal`](VSMessageType::mtFatal),
+    ///     If `msgType` is [`VSMessageType::Fatal`],
     ///     VapourSynth will call `abort()` after delivering the message.
     ///
     /// * `msg` - The message.
@@ -2153,7 +2159,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_layout() {
+    fn layout() {
         assert_eq!(
             std::mem::size_of::<VSPresetVideoFormat>(),
             std::mem::size_of::<c_int>(),

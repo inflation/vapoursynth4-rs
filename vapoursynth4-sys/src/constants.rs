@@ -6,6 +6,8 @@
 
 //! VSConstants4.h
 
+#![allow(non_camel_case_types)]
+
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum VSColorRange {

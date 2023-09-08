@@ -5,7 +5,7 @@
 */
 
 use std::{
-    ffi::{CStr, CString},
+    ffi::CStr,
     marker::PhantomData,
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
@@ -13,9 +13,15 @@ use std::{
 };
 
 use crate::{
-    api, ffi, plugin::Plugin, ApiRef, AudioFormat, AudioFrame, AudioInfo, ColorFamily, Filter,
-    FilterExtern, Frame, Function, Map, MapMut, Plugins, SampleType, VideoFormat, VideoFrame,
-    VideoInfo,
+    api, ffi,
+    frame::Frame,
+    frame::{AudioFormat, AudioFrame, VideoFormat, VideoFrame},
+    function::Function,
+    map::MapMut,
+    node::{internal::FilterExtern, Dependencies, Filter},
+    plugin::Plugin,
+    plugin::Plugins,
+    AudioInfo, ColorFamily, SampleType, VideoInfo,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -27,7 +33,7 @@ pub struct CoreRef<'c> {
 
 impl<'c> CoreRef<'c> {
     #[must_use]
-    pub unsafe fn from_ptr(ptr: *const ffi::VSCore) -> Self {
+    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSCore) -> Self {
         Self {
             handle: NonNull::new_unchecked(ptr.cast_mut()),
             marker: PhantomData,
@@ -100,77 +106,59 @@ impl Core {
         }
     }
 
-    /// # Errors
+    /// # Panics
     ///
-    /// Return error from underlying API
+    /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_video_filter<F: Filter>(
         &mut self,
         mut out: MapMut<'_>,
-        name: impl Into<Vec<u8>>,
+        name: &CStr,
         info: &VideoInfo,
         filter: Box<F>,
-        dependencies: &[ffi::VSFilterDependency],
-    ) -> Result<(), String> {
+        dependencies: &Dependencies,
+    ) {
         unsafe {
-            let name = CString::new(name).map_err(|_| "Invalid name".to_string())?;
             (api().createVideoFilter)(
                 (*out).as_mut_ptr(),
                 name.as_ptr(),
                 info,
                 F::filter_get_frame,
                 Some(F::filter_free),
-                F::FILTER_MODE.into(),
+                F::FILTER_MODE,
                 dependencies.as_ptr(),
-                dependencies
-                    .len()
-                    .try_into()
-                    .map_err(|_| "dependencies len is larger than i32::MAX".to_string())?,
+                dependencies.len().try_into().unwrap(),
                 Box::into_raw(filter).cast(),
                 self.as_mut_ptr(),
             );
         }
-
-        if let Some(e) = out.get_error() {
-            return Err(e);
-        }
-        Ok(())
     }
 
-    /// # Errors
+    /// # Panics
     ///
-    /// Return error from underlying API
+    /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_audio_filter<F: Filter>(
         &mut self,
         mut out: MapMut<'_>,
-        name: impl Into<Vec<u8>>,
+        name: &CStr,
         info: &AudioInfo,
         filter: F,
-        dependencies: &[ffi::VSFilterDependency],
-    ) -> Result<(), String> {
+        dependencies: &Dependencies,
+    ) {
         let filter = Box::new(filter);
         unsafe {
-            let name = CString::new(name).map_err(|_| "Invalid name".to_string())?;
             (api().createAudioFilter)(
                 out.as_mut_ptr(),
                 name.as_ptr(),
                 info,
                 F::filter_get_frame,
                 Some(F::filter_free),
-                F::FILTER_MODE.into(),
+                F::FILTER_MODE,
                 dependencies.as_ptr(),
-                dependencies
-                    .len()
-                    .try_into()
-                    .map_err(|_| "dependencies len is larger than i32::MAX".to_string())?,
+                dependencies.len().try_into().unwrap(),
                 Box::into_raw(filter).cast(),
                 self.as_mut_ptr(),
             );
         }
-
-        if let Some(e) = out.get_error() {
-            return Err(e);
-        }
-        Ok(())
     }
 
     #[must_use]
@@ -186,10 +174,10 @@ impl Core {
                 format,
                 width,
                 height,
-                prop_src.map_or(null_mut(), |f| f.as_ptr()),
+                prop_src.map_or(null_mut(), Frame::as_ptr),
                 self.as_ptr().cast_mut(),
             );
-            Frame::from_ptr(ptr)
+            VideoFrame::from_ptr(ptr)
         }
     }
 
@@ -210,10 +198,10 @@ impl Core {
                 height,
                 plane_src.as_ptr(),
                 planes.as_ptr(),
-                prop_src.map_or(null_mut(), |f| f.as_ptr()),
+                prop_src.map_or(null_mut(), Frame::as_ptr),
                 self.as_ptr().cast_mut(),
             );
-            Frame::from_ptr(ptr)
+            VideoFrame::from_ptr(ptr)
         }
     }
 
@@ -228,10 +216,10 @@ impl Core {
             let ptr = (api().newAudioFrame)(
                 format,
                 num_samples,
-                prop_src.map_or(null_mut(), |f| f.as_ptr()),
+                prop_src.map_or(null_mut(), Frame::as_ptr),
                 self.as_ptr().cast_mut(),
             );
-            Frame::from_ptr(ptr)
+            AudioFrame::from_ptr(ptr)
         }
     }
 
@@ -250,16 +238,16 @@ impl Core {
                 num_samples,
                 channel_src.as_ptr(),
                 channels.as_ptr(),
-                prop_src.map_or(null_mut(), |f| f.as_ptr()),
+                prop_src.map_or(null_mut(), Frame::as_ptr),
                 self.as_ptr().cast_mut(),
             );
-            Frame::from_ptr(ptr)
+            AudioFrame::from_ptr(ptr)
         }
     }
 
     #[must_use]
     pub fn copy_frame<F: Frame>(&self, frame: &F) -> F {
-        unsafe { Frame::from_ptr((api().copyFrame)(frame.as_ptr(), self.as_ptr().cast_mut())) }
+        unsafe { F::from_ptr((api().copyFrame)(frame.as_ptr(), self.as_ptr().cast_mut())) }
     }
 
     #[must_use]
@@ -275,8 +263,8 @@ impl Core {
             let mut format = MaybeUninit::uninit();
             (api().queryVideoFormat)(
                 format.as_mut_ptr(),
-                color_family.into(),
-                sample_type.into(),
+                color_family,
+                sample_type,
                 bits_per_sample,
                 subsampling_w,
                 subsampling_h,
@@ -297,7 +285,7 @@ impl Core {
             let mut format = MaybeUninit::uninit();
             (api().queryAudioFormat)(
                 format.as_mut_ptr(),
-                sample_type.into(),
+                sample_type,
                 bits_per_sample,
                 channel_layout,
                 self.as_ptr().cast_mut(),
@@ -317,8 +305,8 @@ impl Core {
     ) -> u32 {
         unsafe {
             (api().queryVideoFormatID)(
-                color_family.into(),
-                sample_type.into(),
+                color_family,
+                sample_type,
                 bits_per_sample,
                 subsampling_w,
                 subsampling_h,
@@ -398,7 +386,6 @@ impl Drop for Core {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct CoreBuilder {
     flags: i32,
-    api: Option<ApiRef>,
     max_cache_size: Option<i64>,
     thread_count: Option<i32>,
 }
@@ -422,17 +409,17 @@ impl CoreBuilder {
     }
 
     pub fn enable_graph_inspection(&mut self) -> &mut Self {
-        self.flags |= ffi::VSCoreCreationFlags::ccfEnableGraphInspection as i32;
+        self.flags |= ffi::VSCoreCreationFlags::EnableGraphInspection as i32;
         self
     }
 
     pub fn disable_auto_loading(&mut self) -> &mut Self {
-        self.flags |= ffi::VSCoreCreationFlags::ccfDisableAutoLoading as i32;
+        self.flags |= ffi::VSCoreCreationFlags::DisableAutoLoading as i32;
         self
     }
 
     pub fn disable_library_unloading(&mut self) -> &mut Self {
-        self.flags |= ffi::VSCoreCreationFlags::ccfDisableLibraryUnloading as i32;
+        self.flags |= ffi::VSCoreCreationFlags::DisableLibraryUnloading as i32;
         self
     }
 
@@ -445,26 +432,20 @@ impl CoreBuilder {
         self.thread_count = Some(count);
         self
     }
-
-    pub fn api(&mut self, api: ApiRef) -> &mut Self {
-        self.api = Some(api);
-        self
-    }
 }
 
 #[cfg(test)]
 mod tests {
+    use testresult::TestResult;
+
+    use crate::set_api_default;
+
     use super::*;
 
     #[test]
-    fn api() {
-        let core = Core::new();
-        let info = core.get_info();
-        println!("{info:?}");
-    }
+    fn builder() -> TestResult {
+        set_api_default()?;
 
-    #[test]
-    fn builder() {
         let core = CoreBuilder::new()
             .enable_graph_inspection()
             .disable_auto_loading()
@@ -472,7 +453,9 @@ mod tests {
             .max_cache_size(1024)
             .thread_count(4)
             .build();
-        assert_eq!(core.get_info().maxFramebufferSize, 1024);
-        assert_eq!(core.get_info().numThreads, 4);
+        assert_eq!(core.get_info().max_framebuffer_size, 1024);
+        assert_eq!(core.get_info().num_threads, 4);
+
+        Ok(())
     }
 }

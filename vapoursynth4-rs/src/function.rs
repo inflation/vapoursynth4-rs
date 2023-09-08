@@ -1,6 +1,6 @@
 use std::ptr::NonNull;
 
-use crate::{api, ffi, Map};
+use crate::{api, ffi, map::Map};
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]

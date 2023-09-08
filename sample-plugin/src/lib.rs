@@ -1,16 +1,17 @@
-use std::{
-    ffi::{c_void, CString},
-    panic::AssertUnwindSafe,
-    ptr::null_mut,
-};
+use std::ffi::{c_void, CString};
 
 use const_str::cstr;
-use ffi::helper::isConstantVideoFormat;
 use vapoursynth4_rs::{
-    key, ApiRef, CoreRef, Filter, FilterExtern, FrameContext, MapMut, MapRef, Node, ToCString,
-    Value, VideoFrame, VideoNode,
+    core::CoreRef,
+    frame::{FrameContext, VideoFrame},
+    key,
+    map::{MapMut, MapRef},
+    node::{
+        ActivationReason, Dependencies, Filter, FilterDependency, Node, RequestPattern, VideoNode,
+    },
+    SampleType,
 };
-use vapoursynth4_sys as ffi;
+use vapoursynth4_sys::helper::is_constant_video_format;
 
 struct DumbFilter {
     node: VideoNode,
@@ -20,6 +21,7 @@ struct DumbFilter {
 impl Filter for DumbFilter {
     type Error = CString;
     type FrameType = VideoFrame;
+    type FilterData = ();
 
     fn create<T>(
         input: MapRef<'_>,
@@ -33,9 +35,9 @@ impl Filter for DumbFilter {
         let vi = node.get_info();
 
         unsafe {
-            if !isConstantVideoFormat(&*vi)
-                || (*vi).format.sampleType != ffi::VSSampleType::stInteger
-                || (*vi).format.bitsPerSample != 8
+            if !is_constant_video_format(&*vi)
+                || (*vi).format.sample_type != SampleType::Integer
+                || (*vi).format.bits_per_sample != 8
             {
                 panic!("Invert: only constant format 8bit integer input supported");
             }
@@ -49,13 +51,18 @@ impl Filter for DumbFilter {
                 .unwrap_or(true),
         };
 
-        let deps = [ffi::VSFilterDependency {
+        let deps = [FilterDependency {
             source: filter.node.as_mut_ptr(),
-            requestPattern: ffi::VSRequestPattern::rpStrictSpatial,
+            request_pattern: RequestPattern::StrictSpatial,
         }];
 
-        unsafe { core.create_video_filter(output, "Invert", &*vi, Box::new(filter), &deps) }
-            .map_err(ToCString::into_cstring_lossy)?;
+        core.create_video_filter(
+            output,
+            cstr!("Invert"),
+            unsafe { &*vi },
+            Box::new(filter),
+            Dependencies::new(&deps).unwrap(),
+        );
 
         Ok(())
     }
@@ -63,18 +70,18 @@ impl Filter for DumbFilter {
     fn get_frame(
         &self,
         n: i32,
-        activation_reason: ffi::VSActivationReason,
+        activation_reason: ActivationReason,
         _frame_data: *mut *mut c_void,
         mut ctx: FrameContext,
         core: CoreRef,
     ) -> Result<Option<VideoFrame>, Self::Error> {
-        use ffi::VSActivationReason as r;
+        use ActivationReason as r;
 
         match activation_reason {
-            r::arInitial => {
+            r::Initial => {
                 ctx.request_frame_filter(n, &self.node);
             }
-            r::arAllFramesReady => {
+            r::AllFramesReady => {
                 let src = self.node.get_frame_filter(n, &mut ctx);
                 if !self.enabled {
                     panic!("Not enabled");
@@ -86,7 +93,7 @@ impl Filter for DumbFilter {
 
                 let mut dst = core.new_video_frame(fi, width, height, Some(&src));
 
-                for plane in 0..fi.numPlanes {
+                for plane in 0..fi.num_planes {
                     let mut src_p = src.plane(plane);
                     let src_stride = src.stride(plane);
                     let mut dst_p = dst.plane_mut(plane);
@@ -111,32 +118,37 @@ impl Filter for DumbFilter {
 
         Ok(None)
     }
+
+    fn name() -> &'static std::ffi::CStr {
+        cstr!("Filter")
+    }
+
+    fn args() -> &'static std::ffi::CStr {
+        cstr!("clip:vnode;enabled:int:opt;")
+    }
+
+    fn return_type() -> &'static std::ffi::CStr {
+        cstr!("clip:vnode;")
+    }
 }
 
 /// # Safety
 #[no_mangle]
 pub unsafe extern "system" fn VapourSynthPluginInit2(
-    plugin: *mut ffi::VSPlugin,
-    vspapi: *const ffi::VSPLUGINAPI,
+    plugin: *mut vapoursynth4_sys::VSPlugin,
+    vspapi: *const vapoursynth4_sys::VSPLUGINAPI,
 ) {
     ((*vspapi).configPlugin)(
         cstr!("com.example.invert").as_ptr(),
         cstr!("invert").as_ptr(),
         cstr!("VapourSynth Invert Example").as_ptr(),
-        ffi::VS_MAKE_VERSION(1, 0),
-        ffi::VAPOURSYNTH_API_VERSION,
+        vapoursynth4_sys::vs_make_version(1, 0),
+        vapoursynth4_sys::VAPOURSYNTH_API_VERSION,
         0,
         plugin,
     );
 
-    ((*vspapi).registerFunction)(
-        cstr!("Filter").as_ptr(),
-        cstr!("clip:vnode;enabled:int:opt;").as_ptr(),
-        cstr!("clip:vnode;").as_ptr(),
-        DumbFilter::filter_create,
-        null_mut(),
-        plugin,
-    );
+    DumbFilter::register(None, plugin, vspapi);
 }
 
 // declare_plugin!(

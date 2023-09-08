@@ -1,15 +1,9 @@
-use std::mem::MaybeUninit;
+use std::{ffi::CStr, fmt::Display};
 
-use crate::{api, ffi, ColorFamily, Core, SampleType};
+use crate::{api, ffi};
 
 pub type VideoFormat = ffi::VSVideoFormat;
 pub type AudioFormat = ffi::VSAudioFormat;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Format<'f> {
-    Video(&'f VideoFormat),
-    Audio(&'f AudioFormat),
-}
 
 struct FormatName {
     buffer: [u8; 32],
@@ -18,6 +12,15 @@ struct FormatName {
 impl FormatName {
     fn new() -> Self {
         Self { buffer: [0; 32] }
+    }
+}
+
+impl Display for FormatName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let cstr = unsafe { CStr::from_bytes_until_nul(&self.buffer).unwrap_unchecked() };
+        cstr.to_str()
+            .map_err(|_| std::fmt::Error)
+            .and_then(|s| f.write_str(s))
     }
 }
 
@@ -31,7 +34,7 @@ impl FormatExt for VideoFormat {
         if 0 == unsafe { (api().getVideoFormatName)(self, buffer.buffer.as_mut_ptr().cast()) } {
             None
         } else {
-            Some(unsafe { String::from_utf8_unchecked(buffer.buffer.to_vec()) })
+            Some(buffer.to_string())
         }
     }
 }
@@ -42,7 +45,7 @@ impl FormatExt for AudioFormat {
         if 0 == unsafe { (api().getAudioFormatName)(self, buffer.buffer.as_mut_ptr().cast()) } {
             None
         } else {
-            Some(unsafe { String::from_utf8_unchecked(buffer.buffer.to_vec()) })
+            Some(buffer.to_string())
         }
     }
 }

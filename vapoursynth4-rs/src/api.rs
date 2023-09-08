@@ -4,77 +4,71 @@
  file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-use std::{ops::Deref, ptr::NonNull, sync::OnceLock};
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 use crate::ffi;
 
-pub(crate) static API: OnceLock<ApiRef> = OnceLock::new();
+use self::error::ApiNotFound;
 
-pub(crate) fn api() -> &'static ApiRef {
-    API.get_or_init(ApiRef::default)
+pub(crate) static mut API: Option<AtomicPtr<ffi::VSAPI>> = None;
+
+pub(crate) fn api() -> &'static ffi::VSAPI {
+    unsafe {
+        &*API
+            .as_ref()
+            .expect("Please set API first with `set_api` or `set_api_default`.")
+            .load(Ordering::Acquire)
+    }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
-pub struct ApiRef {
-    handle: NonNull<ffi::VSAPI>,
-}
-
-impl ApiRef {
-    /// # Safety
-    #[must_use]
-    pub unsafe fn from_raw(ptr: *const ffi::VSAPI) -> Self {
-        Self {
-            handle: NonNull::new_unchecked(ptr.cast_mut()),
+/// # Errors
+///
+/// Return [`ApiNotFound`] if the requested API is not found.
+pub fn set_api_default() -> Result<(), ApiNotFound> {
+    let ptr = unsafe { ffi::getVapourSynthAPI(ffi::VAPOURSYNTH_API_VERSION) };
+    if ptr.is_null() {
+        Err(error::ApiNotFound {
+            major: ffi::VAPOURSYNTH_API_MAJOR,
+            minor: ffi::VAPOURSYNTH_API_MINOR,
+        })
+    } else {
+        unsafe {
+            API.replace(AtomicPtr::new(ptr.cast_mut()));
         }
-    }
-
-    #[must_use]
-    pub fn new() -> Option<Self> {
-        Self::new_with_version(ffi::VAPOURSYNTH_API_VERSION)
-    }
-
-    #[must_use]
-    pub fn new_with(major: u16, minor: u16) -> Option<Self> {
-        Self::new_with_version(ffi::VS_MAKE_VERSION(major, minor))
-    }
-
-    #[must_use]
-    pub fn new_with_version(version: i32) -> Option<Self> {
-        let handle = NonNull::new(unsafe { ffi::getVapourSynthAPI(version) }.cast_mut())?;
-        Some(Self { handle })
-    }
-
-    #[must_use]
-    pub fn get_version(&self) -> i32 {
-        unsafe { (self.getAPIVersion)() }
-    }
-
-    pub fn set(self) -> Result<(), Self> {
-        API.set(self)
+        Ok(())
     }
 }
 
-impl Deref for ApiRef {
-    type Target = ffi::VSAPI;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { self.handle.as_ref() }
+/// # Errors
+///
+/// Return [`ApiNotFound`] if the requested API is not found.
+pub fn set_api(major: u16, minor: u16) -> Result<(), ApiNotFound> {
+    let version = ffi::vs_make_version(major, minor);
+    let ptr = unsafe { ffi::getVapourSynthAPI(version) };
+    if ptr.is_null() {
+        Err(error::ApiNotFound { major, minor })
+    } else {
+        unsafe {
+            API.replace(AtomicPtr::new(ptr.cast_mut()));
+        }
+        Ok(())
     }
 }
 
-impl Default for ApiRef {
-    /// # Panics
-    ///
-    /// Panic if [`getVapourSynthAPI()`](ffi::getVapourSynthAPI) returns `NULL`
-    fn default() -> Self {
-        Self::new().expect(
-            "Failed to get API with the version specified by features. \
-             Check if the version is supported by the linked VapourSynth library, \
-             or lowering the requirement in `Cargo.toml`.",
-        )
-    }
+pub(crate) unsafe fn set_api_from_raw(ptr: *const ffi::VSAPI) {
+    API.replace(AtomicPtr::new(ptr.cast_mut()));
 }
 
-unsafe impl Send for ApiRef {}
-unsafe impl Sync for ApiRef {}
+pub mod error {
+    use thiserror::Error;
+
+    #[derive(Error, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[error(
+        "Request API with version {major}.{minor} failed. \
+        Please check if the version is supported by the linked VapourSynth library."
+    )]
+    pub struct ApiNotFound {
+        pub major: u16,
+        pub minor: u16,
+    }
+}

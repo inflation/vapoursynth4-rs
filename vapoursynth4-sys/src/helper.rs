@@ -15,22 +15,22 @@ use crate::*;
 /// Convenience function for checking if the format never changes between frames
 #[inline]
 #[must_use]
-pub const fn isConstantVideoFormat(vi: &VSVideoInfo) -> bool {
+pub const fn is_constant_video_format(vi: &VSVideoInfo) -> bool {
     vi.height > 0
         && vi.width > 0
-        && vi.format.colorFamily as i32 != VSColorFamily::cfUndefined as i32
+        && vi.format.color_family as i32 != VSColorFamily::Undefined as i32
 }
 
 /// Convenience function to check if two clips have the same format
 /// (unknown/changeable will be considered the same too)
 #[inline]
 #[must_use]
-pub const fn isSameVideoFormat(v1: &VSVideoFormat, v2: &VSVideoFormat) -> bool {
-    v1.colorFamily as i32 == v2.colorFamily as i32
-        && v1.sampleType as i32 == v2.sampleType as i32
-        && v1.bitsPerSample == v2.bitsPerSample
-        && v1.subSamplingW == v2.subSamplingW
-        && v1.subSamplingH == v2.subSamplingH
+pub const fn is_same_video_format(v1: &VSVideoFormat, v2: &VSVideoFormat) -> bool {
+    v1.color_family as i32 == v2.color_family as i32
+        && v1.sample_type as i32 == v2.sample_type as i32
+        && v1.bits_per_sample == v2.bits_per_sample
+        && v1.sub_sampling_w == v2.sub_sampling_w
+        && v1.sub_sampling_h == v2.sub_sampling_h
 }
 
 impl VSAPI {
@@ -40,20 +40,20 @@ impl VSAPI {
     ///
     /// `core` must be valid
     #[inline]
-    pub unsafe fn isSameVideoPresetFormat(
+    pub unsafe fn is_same_video_preset_format(
         &self,
-        presetFormat: VSPresetVideoFormat,
+        preset_format: VSPresetVideoFormat,
         v: &VSVideoFormat,
         core: *mut VSCore,
     ) -> bool {
         (self.queryVideoFormatID)(
-            v.colorFamily,
-            v.sampleType,
-            v.bitsPerSample,
-            v.subSamplingW,
-            v.subSamplingH,
+            v.color_family,
+            v.sample_type,
+            v.bits_per_sample,
+            v.sub_sampling_w,
+            v.sub_sampling_h,
             core,
-        ) == presetFormat as u32
+        ) == preset_format as u32
     }
 }
 
@@ -62,33 +62,33 @@ impl VSAPI {
 /// (unknown/changeable will be considered the same too)
 #[inline]
 #[must_use]
-pub const fn isSameVideoInfo(v1: &VSVideoInfo, v2: &VSVideoInfo) -> bool {
-    v1.height == v2.height && v1.width == v2.width && isSameVideoFormat(&v1.format, &v2.format)
+pub const fn is_same_video_info(v1: &VSVideoInfo, v2: &VSVideoInfo) -> bool {
+    v1.height == v2.height && v1.width == v2.width && is_same_video_format(&v1.format, &v2.format)
 }
 
 /// Convenience function to check for if two clips have the same format while also including
 /// `sampleRate` (unknown/changeable will be considered the same too)
 #[inline]
 #[must_use]
-pub const fn isSameAudioFormat(a1: &VSAudioFormat, a2: &VSAudioFormat) -> bool {
-    a1.bitsPerSample == a2.bitsPerSample
-        && a1.sampleType as i32 == a2.sampleType as i32
-        && a1.channelLayout == a2.channelLayout
+pub const fn is_same_audio_format(a1: &VSAudioFormat, a2: &VSAudioFormat) -> bool {
+    a1.bits_per_sample == a2.bits_per_sample
+        && a1.sample_type as i32 == a2.sample_type as i32
+        && a1.channel_layout == a2.channel_layout
 }
 
 /// Convenience function to check for if two clips have the same format while also including
 /// `sampleRate` (unknown/changeable will be considered the same too)
 #[inline]
 #[must_use]
-pub const fn isSameAudioInfo(a1: &VSAudioInfo, a2: &VSAudioInfo) -> bool {
-    a1.sampleRate == a2.sampleRate && isSameAudioFormat(&a1.format, &a2.format)
+pub const fn is_same_audio_info(a1: &VSAudioInfo, a2: &VSAudioInfo) -> bool {
+    a1.sample_rate == a2.sample_rate && is_same_audio_format(&a1.format, &a2.format)
 }
 
 /// Multiplies and divides a rational number,
 /// such as a frame duration, in place and reduces the result
-// TODO: use `const` when available
+// TODO: use `const` when available: https://github.com/rust-lang/rust/issues/57349
 #[inline]
-pub fn muldivRational(num: &mut i64, den: &mut i64, mul: i64, div: i64) {
+pub fn muldiv_rational(num: &mut i64, den: &mut i64, mul: i64, div: i64) {
     // do nothing if the rational number is invalid
     if *den == 0 {
         return;
@@ -113,13 +113,13 @@ pub fn muldivRational(num: &mut i64, den: &mut i64, mul: i64, div: i64) {
 
 /// Reduces a rational number
 #[inline]
-pub fn reduceRational(num: &mut i64, den: &mut i64) {
-    muldivRational(num, den, 1, 1);
+pub fn reduce_rational(num: &mut i64, den: &mut i64) {
+    muldiv_rational(num, den, 1, 1);
 }
 
 /// Add two rational numbers and reduces the result
 #[inline]
-pub fn addRational(num: &mut i64, den: &mut i64, mut addnum: i64, addden: i64) {
+pub fn add_rational(num: &mut i64, den: &mut i64, mut addnum: i64, addden: i64) {
     // Do nothing if the rational number is invalid
     if *den == 0 {
         return;
@@ -136,7 +136,7 @@ pub fn addRational(num: &mut i64, den: &mut i64, mut addnum: i64, addden: i64) {
 
         *num += addnum;
 
-        reduceRational(num, den);
+        reduce_rational(num, den);
     }
 }
 
@@ -144,7 +144,7 @@ pub fn addRational(num: &mut i64, den: &mut i64, mut addnum: i64, addden: i64) {
 /// int properties among other things
 #[inline]
 #[must_use]
-pub const fn int64ToIntS(i: i64) -> c_int {
+pub const fn int64_to_int_s(i: i64) -> c_int {
     if i > c_int::MAX as i64 {
         c_int::MAX
     } else if i < c_int::MIN as i64 {
@@ -158,7 +158,7 @@ pub const fn int64ToIntS(i: i64) -> c_int {
 /// float properties among other things
 #[inline]
 #[must_use]
-pub const fn doubleToFloatS(d: f64) -> f32 {
+pub const fn double_to_float_s(d: f64) -> f32 {
     d as f32
 }
 
@@ -174,6 +174,7 @@ pub const unsafe fn bitblt(
     height: usize,
 ) {
     if height != 0 {
+        #[allow(clippy::cast_possible_wrap)]
         if src_stride == dst_stride && src_stride == row_size as isize {
             dstp.copy_from_nonoverlapping(srcp, row_size * height);
         } else {
@@ -194,6 +195,6 @@ pub const unsafe fn bitblt(
 // returns non-zero for valid width and height
 #[inline]
 #[must_use]
-pub const fn areValidDimensions(fi: &VSVideoFormat, width: c_int, height: c_int) -> bool {
-    width % (1 << fi.subSamplingW) == 0 && height % (1 << fi.subSamplingH) == 0
+pub const fn are_valid_dimensions(fi: &VSVideoFormat, width: c_int, height: c_int) -> bool {
+    width % (1 << fi.sub_sampling_w) == 0 && height % (1 << fi.sub_sampling_h) == 0
 }

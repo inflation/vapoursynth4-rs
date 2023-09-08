@@ -4,7 +4,7 @@
  file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-mod constants;
+mod dependency;
 mod filter;
 
 use std::{
@@ -12,9 +12,16 @@ use std::{
     ptr::NonNull,
 };
 
-use crate::{api, ffi, AudioFrame, AudioInfo, Core, Frame, FrameContext, VideoFrame, VideoInfo};
+use crate::{
+    api,
+    core::Core,
+    ffi,
+    frame::{internal::FrameFromPtr, AudioFrame, Frame, FrameContext, VideoFrame},
+    node::internal::FilterExtern,
+    AudioInfo, VideoInfo,
+};
 
-pub use constants::*;
+pub use dependency::*;
 pub use filter::*;
 
 pub trait Node: Sized + crate::_private::Sealed {
@@ -37,7 +44,7 @@ pub trait Node: Sized + crate::_private::Sealed {
 
     fn set_cache_mode(&mut self, mode: CacheMode) {
         unsafe {
-            (api().setCacheMode)(self.as_mut_ptr(), mode.into());
+            (api().setCacheMode)(self.as_mut_ptr(), mode);
         }
     }
 
@@ -230,3 +237,6 @@ impl Drop for AudioNode {
         unsafe { (api().freeNode)(self.as_mut_ptr()) }
     }
 }
+
+pub type FilterMode = ffi::VSFilterMode;
+pub type CacheMode = ffi::VSCacheMode;

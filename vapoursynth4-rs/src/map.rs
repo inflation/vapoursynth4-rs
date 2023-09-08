@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_char, c_int, CStr, CString},
+    ffi::{c_char, c_int, CStr},
     marker::PhantomData,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
@@ -8,7 +8,12 @@ use std::{
 
 use thiserror::Error;
 
-use crate::{api, ffi, AudioFrame, AudioNode, Frame, Function, Node, VideoFrame, VideoNode};
+use crate::{
+    api, ffi,
+    frame::{AudioFrame, Frame, VideoFrame},
+    function::Function,
+    node::{AudioNode, Node, VideoNode},
+};
 
 mod key;
 pub use key::*;
@@ -127,12 +132,12 @@ impl Map {
     }
 
     #[must_use]
-    pub fn get_error(&self) -> Option<String> {
+    pub fn get_error(&self) -> Option<&CStr> {
         let ptr = unsafe { (api().mapGetError)(self.as_ptr()) };
         if ptr.is_null() {
             None
         } else {
-            Some(unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() })
+            Some(unsafe { CStr::from_ptr(ptr) })
         }
     }
 
@@ -185,7 +190,7 @@ impl Map {
         key: &KeyStr,
         index: i32,
     ) -> Result<T, MapPropertyError> {
-        let mut error = ffi::VSMapPropertyError::peSuccess;
+        let mut error = ffi::VSMapPropertyError::Success;
         handle_get_error(func(self.as_ptr(), key.as_ptr(), index, &mut error), error)
     }
 
@@ -211,7 +216,7 @@ impl Map {
         use ffi::VSDataTypeHint as dt;
 
         unsafe {
-            if let dt::dtUnknown | dt::dtBinary = self._get(api().mapGetDataTypeHint, key, index)? {
+            if let dt::Unknown | dt::Binary = self._get(api().mapGetDataTypeHint, key, index)? {
                 let size = self._get(api().mapGetDataSize, key, index)?;
                 let ptr = self._get(api().mapGetData, key, index)?;
 
@@ -228,7 +233,7 @@ impl Map {
     #[allow(clippy::cast_sign_loss)]
     pub fn get_utf8(&self, key: &KeyStr, index: i32) -> Result<&str, MapPropertyError> {
         unsafe {
-            if let ffi::VSDataTypeHint::dtUtf8 = self._get(api().mapGetDataTypeHint, key, index)? {
+            if let ffi::VSDataTypeHint::Utf8 = self._get(api().mapGetDataTypeHint, key, index)? {
                 let size = self._get(api().mapGetDataSize, key, index)?;
                 let ptr = self._get(api().mapGetData, key, index)?;
 
@@ -308,23 +313,23 @@ impl Map {
 
         unsafe {
             match (api().mapGetType)(self.as_ptr(), key.as_ptr()) {
-                t::ptUnset => Err(MapPropertyError::KeyNotFound),
-                t::ptInt => self.get_int(key, index).map(Value::Int),
-                t::ptFloat => self.get_float(key, index).map(Value::Float),
-                t::ptData => {
+                t::Unset => Err(MapPropertyError::KeyNotFound),
+                t::Int => self.get_int(key, index).map(Value::Int),
+                t::Float => self.get_float(key, index).map(Value::Float),
+                t::Data => {
                     use ffi::VSDataTypeHint as dt;
 
                     let size = self._get(api().mapGetDataSize, key, index)?;
                     #[allow(clippy::cast_sign_loss)]
                     match self._get(api().mapGetDataTypeHint, key, index)? {
-                        dt::dtUnknown | dt::dtBinary => {
+                        dt::Unknown | dt::Binary => {
                             let ptr = self._get(api().mapGetData, key, index)?;
                             Ok(Value::Data(std::slice::from_raw_parts(
                                 ptr.cast(),
                                 size as _,
                             )))
                         }
-                        dt::dtUtf8 => {
+                        dt::Utf8 => {
                             let ptr = self._get(api().mapGetData, key, index)?;
                             Ok(Value::Utf8(std::str::from_utf8_unchecked(
                                 std::slice::from_raw_parts(ptr.cast(), size as _),
@@ -332,11 +337,11 @@ impl Map {
                         }
                     }
                 }
-                t::ptFunction => self.get_function(key, index).map(Value::Function),
-                t::ptVideoNode => self.get_video_node(key, index).map(Value::VideoNode),
-                t::ptAudioNode => self.get_audio_node(key, index).map(Value::AudioNode),
-                t::ptVideoFrame => self.get_video_frame(key, index).map(Value::VideoFrame),
-                t::ptAudioFrame => self.get_audio_frame(key, index).map(Value::AudioFrame),
+                t::Function => self.get_function(key, index).map(Value::Function),
+                t::VideoNode => self.get_video_node(key, index).map(Value::VideoNode),
+                t::AudioNode => self.get_audio_node(key, index).map(Value::AudioNode),
+                t::VideoFrame => self.get_video_frame(key, index).map(Value::VideoFrame),
+                t::AudioFrame => self.get_audio_frame(key, index).map(Value::AudioFrame),
             }
         }
     }
@@ -352,7 +357,7 @@ impl Map {
     ///
     /// Return [`MapPropertyError`] if the underlying API does not success
     pub fn get_int_array(&self, key: &KeyStr) -> Result<&[i64], MapPropertyError> {
-        let mut error = ffi::VSMapPropertyError::peSuccess;
+        let mut error = ffi::VSMapPropertyError::Success;
         unsafe {
             let size = self
                 .num_elements(key)
@@ -379,7 +384,7 @@ impl Map {
     ///
     /// Return [`MapPropertyError`] if the underlying API does not success
     pub fn get_float_array(&self, key: &KeyStr) -> Result<&[f64], MapPropertyError> {
-        let mut error = ffi::VSMapPropertyError::peSuccess;
+        let mut error = ffi::VSMapPropertyError::Success;
         unsafe {
             let size = self
                 .num_elements(key)
@@ -440,7 +445,7 @@ impl Map {
                     key.as_ptr(),
                     val.as_ptr().cast(),
                     val.len().try_into().unwrap(),
-                    ffi::VSDataTypeHint::dtBinary,
+                    ffi::VSDataTypeHint::Binary,
                     append.into(),
                 )),
                 Value::Utf8(val) => handle_set_error((api().mapSetData)(
@@ -448,7 +453,7 @@ impl Map {
                     key.as_ptr(),
                     val.as_ptr().cast(),
                     val.len().try_into().unwrap(),
-                    ffi::VSDataTypeHint::dtUtf8,
+                    ffi::VSDataTypeHint::Utf8,
                     append.into(),
                 )),
                 Value::VideoNode(val) => self._set(
@@ -600,11 +605,11 @@ fn handle_get_error<T>(res: T, error: ffi::VSMapPropertyError) -> Result<T, MapP
     use MapPropertyError as pe;
 
     match error {
-        e::peSuccess => Ok(res),
-        e::peUnset => Err(pe::KeyNotFound),
-        e::peType => Err(pe::InvalidType),
-        e::peIndex => Err(pe::IndexOutOfBound),
-        e::peError => Err(pe::MapError),
+        e::Success => Ok(res),
+        e::Unset => Err(pe::KeyNotFound),
+        e::Type => Err(pe::InvalidType),
+        e::Index => Err(pe::IndexOutOfBound),
+        e::Error => Err(pe::MapError),
     }
 }
 
@@ -646,29 +651,7 @@ pub enum MapPropertyError {
     MapError,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum AppendMode {
-    Replace,
-    Append,
-}
-
-impl From<ffi::VSMapAppendMode> for AppendMode {
-    fn from(value: ffi::VSMapAppendMode) -> Self {
-        match value {
-            ffi::VSMapAppendMode::maReplace => AppendMode::Replace,
-            ffi::VSMapAppendMode::maAppend => AppendMode::Append,
-        }
-    }
-}
-
-impl From<AppendMode> for ffi::VSMapAppendMode {
-    fn from(value: AppendMode) -> Self {
-        match value {
-            AppendMode::Replace => ffi::VSMapAppendMode::maReplace,
-            AppendMode::Append => ffi::VSMapAppendMode::maAppend,
-        }
-    }
-}
+pub type AppendMode = ffi::VSMapAppendMode;
 
 #[cfg(test)]
 mod tests {
@@ -677,10 +660,13 @@ mod tests {
     use const_str::cstr;
     use testresult::TestResult;
 
+    use crate::set_api_default;
+
     use super::*;
 
     #[test]
     fn clear() -> TestResult {
+        set_api_default()?;
         let mut map = Map::default();
         let key = crate::key!("what");
         map.set(key, Value::Int(42), AppendMode::Replace)?;
@@ -694,13 +680,14 @@ mod tests {
 
     #[test]
     fn error() -> TestResult {
+        set_api_default()?;
         let mut map = Map::default();
         let key = crate::key!("what");
         map.set(key, Value::Float(42.0), AppendMode::Replace)?;
 
         map.set_error(cstr!("Yes"));
         match map.get_error() {
-            Some(msg) => assert_eq!(msg, String::from("Yes"), "Error message is not match"),
+            Some(msg) => assert_eq!(msg, cstr!("Yes"), "Error message is not match"),
             None => panic!("Error is not set"),
         }
         let res = map.get(key, 0);
@@ -724,6 +711,7 @@ mod tests {
 
     #[test]
     fn len() -> TestResult {
+        set_api_default()?;
         let mut map = Map::default();
         let key = crate::key!("what");
 
@@ -737,6 +725,7 @@ mod tests {
 
     #[test]
     fn key() -> TestResult {
+        set_api_default()?;
         let mut map = Map::default();
         let key = crate::key!("what");
 
@@ -762,6 +751,7 @@ mod tests {
     #[test]
     #[allow(clippy::float_cmp)]
     fn get_set() -> TestResult {
+        set_api_default()?;
         let mut map = Map::default();
         let key = crate::key!("what");
 

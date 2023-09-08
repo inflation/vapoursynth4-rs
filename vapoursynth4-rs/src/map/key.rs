@@ -92,11 +92,12 @@ impl Display for KeyStr {
 #[macro_export]
 macro_rules! key {
     ($s:expr) => {{
-        const OUTPUT_LEN: ::core::primitive::usize = $crate::__macro_impl::ToCStr($s).output_len();
-        const OUTPUT_BUF: [u8; OUTPUT_LEN] = $crate::__macro_impl::ToCStr($s).const_eval();
+        const OUTPUT_LEN: ::core::primitive::usize =
+            $crate::utils::__macro_impl::ToCStr($s).output_len();
+        const OUTPUT_BUF: [u8; OUTPUT_LEN] = $crate::utils::__macro_impl::ToCStr($s).const_eval();
         const OUTPUT: &::core::ffi::CStr =
             unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(&OUTPUT_BUF) };
-        $crate::KeyStr::from_cstr(OUTPUT)
+        $crate::map::KeyStr::from_cstr(OUTPUT)
     }};
 }
 

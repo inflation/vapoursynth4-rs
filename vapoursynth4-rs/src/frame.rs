@@ -6,7 +6,10 @@
 
 use std::ptr::NonNull;
 
-use crate::{api, ffi, MapMut, MapRef, MediaType};
+use crate::{
+    api, ffi,
+    map::{MapMut, MapRef},
+};
 
 mod context;
 mod format;
@@ -14,10 +17,7 @@ mod format;
 pub use context::*;
 pub use format::*;
 
-pub trait Frame: Sized + crate::_private::Sealed {
-    #[must_use]
-    unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self;
-
+pub trait Frame: Sized + internal::FrameFromPtr {
     #[must_use]
     fn as_ptr(&self) -> *const ffi::VSFrame;
 
@@ -41,20 +41,28 @@ pub trait Frame: Sized + crate::_private::Sealed {
     }
 }
 
+pub(crate) mod internal {
+    use super::*;
+
+    pub trait FrameFromPtr {
+        unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self;
+    }
+}
+
 #[derive(PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
 pub struct VideoFrame {
     handle: NonNull<ffi::VSFrame>,
 }
 
-impl crate::_private::Sealed for VideoFrame {}
-impl Frame for VideoFrame {
+impl internal::FrameFromPtr for VideoFrame {
     unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self {
-        Self {
+        VideoFrame {
             handle: NonNull::new_unchecked(ptr.cast_mut()),
         }
     }
-
+}
+impl Frame for VideoFrame {
     fn as_ptr(&self) -> *const ffi::VSFrame {
         self.handle.as_ptr()
     }
@@ -65,6 +73,12 @@ impl Frame for VideoFrame {
 }
 
 impl VideoFrame {
+    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self {
+        Self {
+            handle: NonNull::new_unchecked(ptr.cast_mut()),
+        }
+    }
+
     #[must_use]
     pub fn stride(&self, plane: i32) -> isize {
         unsafe { (api().getStride)(self.as_ptr(), plane) }
@@ -126,14 +140,14 @@ pub struct AudioFrame {
     handle: NonNull<ffi::VSFrame>,
 }
 
-impl crate::_private::Sealed for AudioFrame {}
-impl Frame for AudioFrame {
+impl internal::FrameFromPtr for AudioFrame {
     unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self {
-        Self {
+        AudioFrame {
             handle: NonNull::new_unchecked(ptr.cast_mut()),
         }
     }
-
+}
+impl Frame for AudioFrame {
     fn as_ptr(&self) -> *const ffi::VSFrame {
         self.handle.as_ptr()
     }
@@ -144,6 +158,12 @@ impl Frame for AudioFrame {
 }
 
 impl AudioFrame {
+    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self {
+        Self {
+            handle: NonNull::new_unchecked(ptr.cast_mut()),
+        }
+    }
+
     #[must_use]
     pub fn channel(&self, channel: i32) -> *const u8 {
         unsafe { (api().getReadPtr)(self.as_ptr(), channel) }
@@ -171,3 +191,5 @@ impl Drop for AudioFrame {
         unsafe { (api().freeFrame)(self.handle.as_ptr()) }
     }
 }
+
+pub type MediaType = ffi::VSMediaType;

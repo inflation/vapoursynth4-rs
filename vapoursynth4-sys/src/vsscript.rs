@@ -36,7 +36,7 @@ use super::*;
 
 pub const VSSCRIPT_API_MAJOR: u16 = 4;
 pub const VSSCRIPT_API_MINOR: u16 = if cfg!(feature = "vsscript-41") { 1 } else { 0 };
-pub const VSSCRIPT_API_VERSION: i32 = VS_MAKE_VERSION(VSSCRIPT_API_MAJOR, VSSCRIPT_API_MINOR);
+pub const VSSCRIPT_API_VERSION: i32 = vs_make_version(VSSCRIPT_API_MAJOR, VSSCRIPT_API_MINOR);
 
 opaque_struct!(
     /// A script environment. All evaluation and communication with evaluated scripts happens
@@ -45,6 +45,7 @@ opaque_struct!(
 );
 
 /// This struct is the way to access VSScript’s public API.
+#[allow(non_snake_case)]
 #[repr(C)]
 pub struct VSSCRIPTAPI {
     /// Returns the api version provided by vsscript.
@@ -89,7 +90,7 @@ pub struct VSSCRIPTAPI {
     /// * `buffer` - The entire script to evaluate, as a C string.
     ///
     /// * `scriptFilename` - A name for the script, which will be displayed in error messages.
-    ///     If this is `NULL`, the name "<string>" will be used.
+    ///     If this is `NULL`, the name "\<string\>" will be used.
     ///
     /// The special `__file__` variable will be set to `scriptFilename`'s absolute path
     /// if this is not `NULL`.

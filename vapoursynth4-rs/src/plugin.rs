@@ -1,36 +1,11 @@
 use std::{ffi::CStr, ptr::NonNull};
 
-use crate::{api, ffi, Core, Map, MapRef};
-
-#[macro_export]
-macro_rules! declare_plugin {
-    ($ident:expr, $namespace:expr, $name:expr, $ver:expr, $api_ver:expr, $flags:expr $(,)*) => {
-        #[no_mangle]
-        pub unsafe extern "system" fn VapourSynthPluginInit2(
-            plugin: *mut vapoursynth4_sys::VSPlugin,
-            vspapi: *const vapoursynth4_sys::VSPLUGINAPI,
-        ) {
-            ((*vspapi).configPlugin)(
-                std::ffi::CString::new($ident).unwrap().as_ptr(),
-                std::ffi::CString::new($namespace).unwrap().as_ptr(),
-                std::ffi::CString::new($name).unwrap().as_ptr(),
-                $ver,
-                $api_ver,
-                $flags,
-                plugin,
-            );
-
-            ((*vspapi).registerFunction)(
-                std::ffi::CString::new("Filter").unwrap().as_ptr(),
-                std::ffi::CString::new("clip:vnode;").unwrap().as_ptr(),
-                CStr::from_bytes_with_nul_unchecked(b"clip:vnode;\0").as_ptr(),
-                filter_create,
-                null_mut(),
-                plugin,
-            );
-        }
-    };
-}
+use crate::{
+    api,
+    core::Core,
+    ffi,
+    map::{Map, MapRef},
+};
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Plugin {
@@ -41,12 +16,6 @@ impl Plugin {
     #[must_use]
     pub fn new(handle: NonNull<ffi::VSPlugin>) -> Self {
         Self { handle }
-    }
-
-    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSPlugin) -> Self {
-        Self {
-            handle: NonNull::new_unchecked(ptr),
-        }
     }
 
     #[must_use]
@@ -85,6 +54,35 @@ impl Plugin {
             Map::from_ptr(ptr)
         }
     }
+
+    #[must_use]
+    pub fn functions(&self) -> Functions<'_> {
+        Functions::new(self)
+    }
+
+    #[must_use]
+    pub fn get_function_by_name(&self, name: &CStr) -> Option<PluginFunction> {
+        unsafe {
+            NonNull::new((api().getPluginFunctionByName)(
+                name.as_ptr(),
+                self.as_ptr().cast_mut(),
+            ))
+        }
+        .map(|handle| PluginFunction { handle })
+    }
+
+    #[must_use]
+    pub fn path(&self) -> &CStr {
+        unsafe {
+            let ptr = (api().getPluginPath)(self.as_ptr().cast_mut());
+            CStr::from_ptr(ptr)
+        }
+    }
+
+    #[must_use]
+    pub fn version(&self) -> i32 {
+        unsafe { (api().getPluginVersion)(self.as_ptr().cast_mut()) }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -109,6 +107,73 @@ impl Iterator for Plugins<'_> {
         unsafe {
             let ptr = (api().getNextPlugin)(self.cursor, self.core.as_ptr().cast_mut());
             NonNull::new(ptr).map(Plugin::new)
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub struct PluginFunction {
+    handle: NonNull<ffi::VSPluginFunction>,
+}
+
+impl PluginFunction {
+    #[must_use]
+    pub fn new(handle: NonNull<ffi::VSPluginFunction>) -> Self {
+        Self { handle }
+    }
+
+    #[must_use]
+    pub fn as_ptr(&self) -> *const ffi::VSPluginFunction {
+        self.handle.as_ptr()
+    }
+
+    #[must_use]
+    pub fn name(&self) -> &CStr {
+        unsafe {
+            let ptr = (api().getPluginFunctionName)(self.as_ptr().cast_mut());
+            CStr::from_ptr(ptr)
+        }
+    }
+
+    #[must_use]
+    pub fn arguments(&self) -> &CStr {
+        unsafe {
+            let ptr = (api().getPluginFunctionArguments)(self.as_ptr().cast_mut());
+            CStr::from_ptr(ptr)
+        }
+    }
+
+    #[must_use]
+    pub fn return_type(&self) -> &CStr {
+        unsafe {
+            let ptr = (api().getPluginFunctionReturnType)(self.as_ptr().cast_mut());
+            CStr::from_ptr(ptr)
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Functions<'p> {
+    cursor: *mut ffi::VSPluginFunction,
+    plugin: &'p Plugin,
+}
+
+impl<'p> Functions<'p> {
+    pub(crate) fn new(plugin: &'p Plugin) -> Functions<'p> {
+        Self {
+            cursor: std::ptr::null_mut(),
+            plugin,
+        }
+    }
+}
+
+impl Iterator for Functions<'_> {
+    type Item = PluginFunction;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        unsafe {
+            let ptr = (api().getNextPluginFunction)(self.cursor, self.plugin.as_ptr().cast_mut());
+            NonNull::new(ptr).map(PluginFunction::new)
         }
     }
 }
