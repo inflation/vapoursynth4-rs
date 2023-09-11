@@ -6,6 +6,7 @@
 
 mod dependency;
 mod filter;
+pub(crate) mod internal;
 
 use std::{
     ffi::{CStr, CString},
