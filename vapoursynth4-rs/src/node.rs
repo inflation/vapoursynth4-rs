@@ -115,9 +115,9 @@ impl VideoNode {
     }
 
     #[must_use]
-    pub fn get_info(&self) -> *const VideoInfo {
-        // safety: `vi` is valid if the node is a video node
-        unsafe { (api().getVideoInfo)(self.as_ptr().cast_mut()) }
+    pub fn info(&self) -> &VideoInfo {
+        // SAFETY: `vi` is valid if the node is a video node
+        unsafe { &*(api().getVideoInfo)(self.as_ptr().cast_mut()) }
     }
 
     /// # Panics
@@ -194,9 +194,9 @@ impl AudioNode {
     }
 
     #[must_use]
-    pub fn get_info(&self) -> *const AudioInfo {
-        // safety: `ai` is valid if the node is an audio node
-        unsafe { (api().getAudioInfo)(self.as_ptr().cast_mut()) }
+    pub fn info(&self) -> &AudioInfo {
+        // SAFETY: `ai` is valid if the node is an audio node
+        unsafe { &*(api().getAudioInfo)(self.as_ptr().cast_mut()) }
     }
 
     /// # Panics

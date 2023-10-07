@@ -1,4 +1,4 @@
-use std::ffi::{c_void, CStr, CString};
+use std::ffi::{c_void, CStr};
 
 use const_str::cstr;
 use vapoursynth4_rs::{
@@ -19,7 +19,7 @@ struct DumbFilter {
 }
 
 impl Filter for DumbFilter {
-    type Error = CString;
+    type Error = &'static CStr;
     type FrameType = VideoFrame;
     type FilterData = ();
 
@@ -29,16 +29,19 @@ impl Filter for DumbFilter {
         _data: Option<Box<Self::FilterData>>,
         mut core: CoreRef,
     ) -> Result<(), Self::Error> {
-        let node = input
-            .get_video_node(key!("clip"), 0)
-            .expect("Failed to get clip");
-        let vi = unsafe { node.get_info().as_ref().unwrap() };
+        let Ok(node) = input.get_video_node(key!("clip"), 0) else {
+            return Err(cstr!("Failed to get clip"));
+        };
+        let n = node.clone();
+        let vi = n.info();
 
         if !vapoursynth4_rs::utils::is_constant_video_format(vi)
             || vi.format.sample_type != SampleType::Integer
             || vi.format.bits_per_sample != 8
         {
-            panic!("Invert: only constant format 8bit integer input supported");
+            return Err(cstr!(
+                "Invert: only constant format 8bit integer input supported"
+            ));
         }
 
         let mut filter = DumbFilter {

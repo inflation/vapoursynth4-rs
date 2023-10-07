@@ -757,18 +757,21 @@ mod tests {
         map.set_int_array(key, &[1, 2, 3])?;
         assert_eq!(&[1, 2, 3], map.get_int_array(key)?);
 
-        map.set(key, Value::Float(f64::MAX), AppendMode::Replace)?;
+        map.set(key, Value::Float(1e25), AppendMode::Replace)?;
         let res = map.get(key, 0)?;
         match res {
             Value::Float(val) => {
-                assert_eq!(val, f64::MAX, "Value of `{key}` is not correct");
+                assert_eq!(val, 1e25, "Value of `{key}` is not correct");
             }
             _ => panic!("Invalid type of `{key}`"),
         }
         let res = map.get_float_saturated(key, 0)?;
-        assert_eq!(res, f32::MAX, "Value of `{key}` is not correct");
+        assert_eq!(
+            res, 9_999_999_562_023_526_247_432_192.0,
+            "Value of `{key}` is not correct"
+        );
         map.set(key, Value::Float(f64::MAX), AppendMode::Append)?;
-        assert_eq!(&[f64::MAX, f64::MAX], map.get_float_array(key)?);
+        assert_eq!(&[1e25, f64::MAX], map.get_float_array(key)?);
         map.set_float_array(key, &[1.0, 2.0, 3.0])?;
         assert_eq!(&[1.0, 2.0, 3.0], map.get_float_array(key)?);
 

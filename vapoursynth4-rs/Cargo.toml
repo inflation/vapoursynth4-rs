@@ -20,5 +20,6 @@ const-str = "0.5.6"
 testresult = "0.3.0"
 
 [features]
+link-library = ["vapoursynth4-sys/link-library"]
 # default = ["macros"]
 # macros = ["vapoursynth4-rs-macros"]

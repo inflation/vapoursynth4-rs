@@ -12,6 +12,7 @@ keywords = ["vapoursynth", "vsscript", "video", "bindings"]
 categories = ["external-ffi-bindings", "multimedia::video"]
 
 [dependencies]
+cc = { version = "1.0.83", optional = true }
 
 [features]
 # Features for enabling higher API versions.
@@ -20,6 +21,12 @@ vsscript-41 = []
 
 # Experimental features.
 vs-graph = []
+
+# Link the VapourSynth library
+link-library = []
+
+# Vendored VapourSynth library. For CI and debugging.
+vendored = ["dep:cc"]
 
 default = [
     "vsscript",
