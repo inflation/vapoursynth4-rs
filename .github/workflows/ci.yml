@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Install Rust
@@ -31,17 +31,23 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: |
+            ~/.rustup/
             ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
+            vapoursynth/
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build VapourSynth in debug mode
+        run: bash scripts/build-vs.sh
       - name: Generate code coverage
         run: cargo +nightly llvm-cov nextest
           --all-features --workspace
-          --ignore-filename-regex jpegxl-sys/
+          --ignore-filename-regex vapoursynth4-sys/
           --lcov --output-path lcov.info
+        env:
+          VAPOURSYNTH_LIB_PATH: target/vapoursynth/lib
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
@@ -54,38 +60,44 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Install Rust
-        run: rustup update nightly
-      - name: Add rust-src
-        run: rustup +nightly component add rust-src
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-      - name: Dependency
-        run: cargo fetch
       - uses: actions/cache@v3
         with:
           path: |
+            ~/.rustup
             ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
+            vapoursynth/
           key: ${{ runner.os }}-cargo-sanitizer-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build VapourSynth in debug mode
+        run: bash scripts/build-vs.sh
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+      - name: Dependency
+        run: cargo fetch
       - name: Address Sanitizer
-        run: cargo +nightly nextest run -Z build-std --target=x86_64-unknown-linux-gnu --all-features
+        run: cargo +nightly test
+          -Z build-std --target=x86_64-unknown-linux-gnu --all-features
         env:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
+          VAPOURSYNTH_LIB_PATH: target/vapoursynth/lib
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Install Rust
@@ -113,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Rust
         run: rustup update stable
       - name: Format check

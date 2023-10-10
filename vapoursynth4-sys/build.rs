@@ -9,16 +9,11 @@ fn main() {
     {
         use std::env;
 
-        const LIBRARY_DIR_VARIABLE: &str = "VAPOURSYNTH_LIB_DIR";
+        const LIBRARY_DIR_VARIABLE: &str = "VAPOURSYNTH_LIB_PATH";
 
         // Make sure the build script is re-run if our env variable is changed.
         println!("cargo:rerun-if-env-changed={}", LIBRARY_DIR_VARIABLE);
-        // Make sure the build script is re-run if our env variable is changed.
-        println!("cargo:rerun-if-env-changed={}", LIBRARY_DIR_VARIABLE);
 
-        if let Ok(dir) = env::var(LIBRARY_DIR_VARIABLE) {
-            println!("cargo:rustc-link-search=native={}", dir);
-        }
         if let Ok(dir) = env::var(LIBRARY_DIR_VARIABLE) {
             println!("cargo:rustc-link-search=native={}", dir);
         }
