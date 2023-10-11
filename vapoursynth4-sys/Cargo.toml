@@ -25,14 +25,7 @@ vs-graph = []
 # Link the VapourSynth library
 link-library = []
 
-# Vendored VapourSynth library. For CI and debugging.
-vendored = ["dep:cc"]
-
-default = [
-    "vsscript",
-    "vsscript-41",
-    "vs-graph"
-]
+default = ["vsscript", "vsscript-41", "vs-graph"]
 
 [package.metadata.docs.rs]
 all-features = true

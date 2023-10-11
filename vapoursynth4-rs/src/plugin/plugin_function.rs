@@ -1,6 +1,6 @@
 use std::{ffi::CStr, ptr::NonNull};
 
-use crate::{api, ffi};
+use crate::{api::api, ffi};
 
 use super::Plugin;
 

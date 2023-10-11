@@ -6,10 +6,10 @@ use std::{
 };
 
 use crate::{
+    api::API,
     core::CoreRef,
     frame::{Frame, FrameContext},
     map::{MapMut, MapRef},
-    set_api_from_raw,
     utils::ToCString,
 };
 
@@ -23,7 +23,7 @@ pub trait FilterExtern: Filter {
         core: *mut ffi::VSCore,
         vsapi: *const ffi::VSAPI,
     ) {
-        set_api_from_raw(vsapi);
+        API.set(vsapi);
 
         let input = MapRef::from_ptr(in_);
         let mut output = MapMut::from_ptr(out);
@@ -59,7 +59,7 @@ pub trait FilterExtern: Filter {
         let filter = instance_data.cast::<Self>().as_mut().unwrap_unchecked();
         let mut ctx = AssertUnwindSafe(FrameContext::from_ptr(frame_ctx));
         let core = CoreRef::from_ptr(core);
-        set_api_from_raw(vsapi);
+        API.set(vsapi);
 
         match std::panic::catch_unwind(|| {
             let ctx = *ctx;
@@ -90,7 +90,7 @@ pub trait FilterExtern: Filter {
     ) {
         let filter = Box::from_raw(instance_data.cast::<Self>());
         let core = CoreRef::from_ptr(core);
-        set_api_from_raw(vsapi);
+        API.set(vsapi);
 
         filter.free(core);
     }

@@ -10,53 +10,44 @@ use crate::ffi;
 
 use self::error::ApiNotFound;
 
-pub(crate) static mut API: Option<AtomicPtr<ffi::VSAPI>> = None;
+pub(crate) static mut API: Api = Api::null();
 
 pub(crate) fn api() -> &'static ffi::VSAPI {
-    unsafe {
-        &*API
-            .as_ref()
-            .expect("Please set API first with `set_api` or `set_api_default`.")
-            .load(Ordering::Acquire)
-    }
+    unsafe { &*API.handle.load(Ordering::Acquire) }
 }
 
-/// # Errors
-///
-/// Return [`ApiNotFound`] if the requested API is not found.
-pub fn set_api_default() -> Result<(), ApiNotFound> {
-    let ptr = unsafe { ffi::getVapourSynthAPI(ffi::VAPOURSYNTH_API_VERSION) };
-    if ptr.is_null() {
-        Err(error::ApiNotFound {
-            major: ffi::VAPOURSYNTH_API_MAJOR,
-            minor: ffi::VAPOURSYNTH_API_MINOR,
-        })
-    } else {
-        unsafe {
-            API.replace(AtomicPtr::new(ptr.cast_mut()));
+#[repr(transparent)]
+pub(crate) struct Api {
+    handle: AtomicPtr<ffi::VSAPI>,
+}
+
+impl Api {
+    const fn null() -> Self {
+        Self {
+            handle: AtomicPtr::new(std::ptr::null_mut()),
         }
-        Ok(())
     }
-}
 
-/// # Errors
-///
-/// Return [`ApiNotFound`] if the requested API is not found.
-pub fn set_api(major: u16, minor: u16) -> Result<(), ApiNotFound> {
-    let version = ffi::vs_make_version(major, minor);
-    let ptr = unsafe { ffi::getVapourSynthAPI(version) };
-    if ptr.is_null() {
-        Err(error::ApiNotFound { major, minor })
-    } else {
-        unsafe {
-            API.replace(AtomicPtr::new(ptr.cast_mut()));
+    pub(crate) fn default() -> Result<*const ffi::VSAPI, ApiNotFound> {
+        let ptr = unsafe { ffi::getVapourSynthAPI(ffi::VAPOURSYNTH_API_VERSION) };
+        if ptr.is_null() {
+            Err(ApiNotFound {
+                major: ffi::VAPOURSYNTH_API_MAJOR,
+                minor: ffi::VAPOURSYNTH_API_MINOR,
+            })
+        } else {
+            Ok(ptr)
         }
-        Ok(())
     }
-}
 
-pub(crate) unsafe fn set_api_from_raw(ptr: *const ffi::VSAPI) {
-    API.replace(AtomicPtr::new(ptr.cast_mut()));
+    pub(crate) fn set(&mut self, ptr: *const ffi::VSAPI) {
+        self.handle.store(ptr.cast_mut(), Ordering::Release);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_default(&mut self) -> Result<(), ApiNotFound> {
+        Self::default().map(|api| self.set(api))
+    }
 }
 
 pub mod error {

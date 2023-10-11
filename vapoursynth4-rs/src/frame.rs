@@ -7,7 +7,8 @@
 use std::ptr::NonNull;
 
 use crate::{
-    api, ffi,
+    api::api,
+    ffi,
     map::{MapMut, MapRef},
 };
 

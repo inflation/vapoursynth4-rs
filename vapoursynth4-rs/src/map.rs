@@ -9,7 +9,8 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    api, ffi,
+    api::api,
+    ffi,
     frame::{AudioFrame, Frame, VideoFrame},
     function::Function,
     node::{AudioNode, Node, VideoNode},
@@ -648,13 +649,14 @@ mod tests {
     use const_str::cstr;
     use testresult::TestResult;
 
-    use crate::set_api_default;
+    use crate::api::API;
 
     use super::*;
 
     #[test]
     fn clear() -> TestResult {
-        set_api_default()?;
+        unsafe { API.set_default()? };
+
         let mut map = Map::default();
         let key = crate::key!("what");
         map.set(key, Value::Int(42), AppendMode::Replace)?;
@@ -668,7 +670,8 @@ mod tests {
 
     #[test]
     fn error() -> TestResult {
-        set_api_default()?;
+        unsafe { API.set_default()? };
+
         let mut map = Map::default();
         let key = crate::key!("what");
         map.set(key, Value::Float(42.0), AppendMode::Replace)?;
@@ -699,7 +702,8 @@ mod tests {
 
     #[test]
     fn len() -> TestResult {
-        set_api_default()?;
+        unsafe { API.set_default()? };
+
         let mut map = Map::default();
         let key = crate::key!("what");
 
@@ -713,7 +717,8 @@ mod tests {
 
     #[test]
     fn key() -> TestResult {
-        set_api_default()?;
+        unsafe { API.set_default()? };
+
         let mut map = Map::default();
         let key = crate::key!("what");
 
@@ -739,7 +744,8 @@ mod tests {
     #[test]
     #[allow(clippy::float_cmp)]
     fn get_set() -> TestResult {
-        set_api_default()?;
+        unsafe { API.set_default()? };
+
         let mut map = Map::default();
         let key = crate::key!("what");
 

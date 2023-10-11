@@ -1,7 +1,8 @@
 use std::{ffi::CStr, ptr::NonNull};
 
 use crate::{
-    api, ffi,
+    api::api,
+    ffi,
     frame::Frame,
     node::{Node, VideoNode},
 };

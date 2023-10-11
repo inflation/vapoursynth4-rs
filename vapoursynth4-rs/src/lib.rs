@@ -11,7 +11,7 @@
 // #![warn(missing_docs)]
 #![allow(clippy::module_name_repetitions)]
 
-mod api;
+pub mod api;
 pub mod core;
 pub mod frame;
 pub mod function;
@@ -19,8 +19,6 @@ pub mod map;
 pub mod node;
 pub mod plugin;
 pub mod utils;
-
-pub use api::*;
 
 pub use vapoursynth4_sys as ffi;
 

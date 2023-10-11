@@ -278,7 +278,7 @@ pub struct VSVideoFormat {
     /// log2 subsampling factor, applied to second and third plane.
     ///
     /// Convenient numbers that can be used like so:
-    /// ```
+    /// ```py
     /// uv_width = y_width >> subSamplingW;
     /// ```
     pub sub_sampling_h: c_int,
@@ -1882,21 +1882,21 @@ pub struct VSAPI {
     ///
     ///     The following example declares the arguments "blah", "moo", and "asdf":
     ///
-    ///     ```
+    ///     ```txt
     ///     blah:vnode;moo:int[]:opt;asdf:float:opt;
     ///     ```
     ///
     ///     The following example declares the arguments "blah" and accepts all other arguments
     ///     no matter the type:
     ///
-    ///     ```
+    ///     ```txt
     ///     blah:vnode;any
     ///     ```
     ///
     /// * `returnType` - Specifies works similarly to `args` but instead specifies which keys
     ///     and what type will be returned. Typically this will be:
     ///
-    ///     ```
+    ///     ```txt
     ///     clip:vnode;
     ///     ```
     ///

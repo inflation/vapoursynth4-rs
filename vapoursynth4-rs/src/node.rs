@@ -14,7 +14,7 @@ use std::{
 };
 
 use crate::{
-    api,
+    api::api,
     core::Core,
     ffi,
     frame::{internal::FrameFromPtr, AudioFrame, Frame, FrameContext, VideoFrame},
