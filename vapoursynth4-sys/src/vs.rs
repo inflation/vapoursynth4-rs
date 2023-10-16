@@ -705,7 +705,7 @@ pub type VSFrameDoneCallback = unsafe extern "system" fn(
 /// * `msgType` - The type of message. One of [`VSMessageType`].
 ///
 ///     If `msgType` is [`VSMessageType::Fatal`]),
-///     `VapourSynth` will call abort() after the message handler returns.
+///     `VapourSynth` will call `abort()` after the message handler returns.
 ///
 /// * `msg` - The message.
 pub type VSLogHandler =

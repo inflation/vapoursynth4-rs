@@ -61,10 +61,11 @@ pub trait FilterExtern: Filter {
         let core = CoreRef::from_ptr(core);
         API.set(vsapi);
 
-        match std::panic::catch_unwind(|| {
+        let frame = std::panic::catch_unwind(|| {
             let ctx = *ctx;
             filter.get_frame(n, activation_reason, frame_data, ctx, core)
-        }) {
+        });
+        match frame {
             Ok(Ok(Some(frame))) => {
                 // Transfer the ownership to VapourSynth
                 let frame = ManuallyDrop::new(frame);

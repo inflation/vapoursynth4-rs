@@ -12,18 +12,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  coverage:
-    name: Code Coverage
-    runs-on: ubuntu-latest
+  tests:
+    name: Unit Tests
     timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch VapourSynth
+        uses: actions/checkout@v4
         with:
-          submodules: recursive
-      - name: Install Rust
-        run: rustup update nightly
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+          repository: vapoursynth/vapoursynth
+          path: vapoursynth
+          ref: R66
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Dependency
@@ -36,9 +41,49 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/
-            vapoursynth/
+            vapoursynth-build/
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build VapourSynth in debug mode
+        run: bash scripts/build-vs.sh
+      - name: Tests
+        run: cargo nextest run --all-features --workspace
+        env:
+          VAPOURSYNTH_LIB_PATH: vapoursynth-build/lib
+          DYLD_LIBRARY_PATH: vapoursynth-build/lib
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Fetch VapourSynth
+        uses: actions/checkout@v4
+        with:
+          repository: vapoursynth/vapoursynth
+          path: vapoursynth
+          ref: R66
+      - name: Install Rust Nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: "llvm-tools"
+      - name: Dependency
+        run: cargo fetch
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            vapoursynth-build/
+          key: ${{ runner.os }}-cargo-cov-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
       - name: Build VapourSynth in debug mode
         run: bash scripts/build-vs.sh
       - name: Generate code coverage
@@ -47,7 +92,8 @@ jobs:
           --ignore-filename-regex vapoursynth4-sys/
           --lcov --output-path lcov.info
         env:
-          VAPOURSYNTH_LIB_PATH: target/vapoursynth/lib
+          VAPOURSYNTH_LIB_PATH: vapoursynth-build/lib
+          DYLD_LIBRARY_PATH: vapoursynth-build/lib
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
@@ -63,34 +109,40 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/cache@v3
+      - name: Fetch VapourSynth
+        uses: actions/checkout@v4
         with:
-          path: |
-            ~/.rustup
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            vapoursynth/
-          key: ${{ runner.os }}-cargo-sanitizer-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build VapourSynth in debug mode
-        run: bash scripts/build-vs.sh
+          repository: vapoursynth/vapoursynth
+          path: vapoursynth
+          ref: R66
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
       - name: Dependency
         run: cargo fetch
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            vapoursynth-build/
+          key: ${{ runner.os }}-cargo-sanitizer-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build VapourSynth in debug mode
+        run: bash scripts/build-vs.sh
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
       - name: Address Sanitizer
         run: cargo +nightly test
           -Z build-std --target=x86_64-unknown-linux-gnu --all-features
         env:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
-          VAPOURSYNTH_LIB_PATH: target/vapoursynth/lib
+          VAPOURSYNTH_LIB_PATH: vapoursynth-build/lib
+          DYLD_LIBRARY_PATH: vapoursynth-build/lib
+          LD_LIBRARY_PATH: vapoursynth-build/lib
 
   clippy:
     name: Clippy
@@ -111,7 +163,6 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/
           key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
       - name: Run Clippy with reviewdog
         uses: giraffate/clippy-action@v1.0.1

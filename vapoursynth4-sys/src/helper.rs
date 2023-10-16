@@ -162,10 +162,12 @@ pub const fn double_to_float_s(d: f64) -> f32 {
     d as f32
 }
 
+/// Copies bytes from one plane to another. Basically, it is memcpy in a loop.
+///
 /// # Safety
 /// `srcp` and `dstp` must be valid and not overlapping
 #[inline]
-pub const unsafe fn bitblt(
+pub unsafe fn bitblt(
     dstp: *mut c_void,
     dst_stride: isize,
     srcp: *const c_void,
