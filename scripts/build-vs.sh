@@ -6,17 +6,25 @@ if [ ! -d "vapoursynth" ]; then
     git clone --branch R64 --depth 1 https://github.com/vapoursynth/vapoursynth.git 
 fi
 
-sudo apt-get install -y libzimg-dev
-sudo pip install Cython
+if [ "$RUNNER_OS" == "Linux" ]; then
+    sudo apt-get install -y libzimg-dev
+elif [ "$RUNNER_OS" == "macOS" ]; then
+    brew install zimg automake
+fi
+
+PREFIX="$PWD/target/vapoursynth"
 
 if [ ! -d "target/vapoursynth" ]; then
+    pip install Cython
+
     cd vapoursynth
-    export PREFIX=$(readlink -f "$PWD/../target/vapoursynth")
     ./autogen.sh
     ./configure CFLAGS="-g -O0 -w" --prefix="$PREFIX"
     make -j"$(nproc)"
-    sudo make install
+    make install
 fi
 
-sudo sh -c "echo $PREFIX/lib > /etc/ld.so.conf.d/vapoursynth.conf"
-sudo ldconfig
+if [ "$RUNNER_OS" == "Linux" ]; then
+    sudo sh -c "echo $PREFIX/lib > /etc/ld.so.conf.d/vapoursynth.conf"
+    sudo ldconfig
+fi
