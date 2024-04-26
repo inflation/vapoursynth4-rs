@@ -28,8 +28,6 @@
 //! If `libvapoursynth-script` is loaded with `dlopen()`, the `RTLD_GLOBAL` flag must be used.
 //! If not, Python won’t be able to import binary modules. This is due to Python’s design.
 
-#![cfg(feature = "vsscript")]
-
 use std::ffi::*;
 
 use super::*;

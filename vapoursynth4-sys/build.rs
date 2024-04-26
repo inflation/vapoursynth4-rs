@@ -20,6 +20,8 @@ fn main() {
 
         // Handle linking to VapourSynth libs.
         println!("cargo:rustc-link-lib=vapoursynth");
+
+        #[cfg(any(feature = "vscript", feature = "vsscript-41"))]
         println!("cargo:rustc-link-lib=vapoursynth-script");
     }
 }
