@@ -24,6 +24,7 @@ pub(crate) fn api() -> &'static ffi::VSAPI {
 /// # Errors
 ///
 /// Return [`ApiNotFound`] if the requested API is not found.
+#[cfg(feature = "link-library")]
 pub fn set_api_default() -> Result<(), ApiNotFound> {
     let ptr = unsafe { ffi::getVapourSynthAPI(ffi::VAPOURSYNTH_API_VERSION) };
     if ptr.is_null() {
@@ -42,6 +43,7 @@ pub fn set_api_default() -> Result<(), ApiNotFound> {
 /// # Errors
 ///
 /// Return [`ApiNotFound`] if the requested API is not found.
+#[cfg(feature = "link-library")]
 pub fn set_api(major: u16, minor: u16) -> Result<(), ApiNotFound> {
     let version = ffi::vs_make_version(major, minor);
     let ptr = unsafe { ffi::getVapourSynthAPI(version) };
