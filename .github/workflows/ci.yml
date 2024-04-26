@@ -12,7 +12,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build-vs:
+    name: Build VapourSynth
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install VapourSynth
+        uses: rlaphoenix/install-vapoursynth-action@v2.1.1
+        with:
+          version: 66
+          cache: true
+
   coverage:
+    needs: [build-vs]
     name: Code Coverage
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -20,6 +32,11 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: Install VapourSynth
+        uses: rlaphoenix/install-vapoursynth-action@v2.1.1
+        with:
+          version: 66
+          cache: true
       - name: Install Rust
         run: rustup update nightly
       - name: Install cargo-llvm-cov
@@ -40,7 +57,7 @@ jobs:
       - name: Generate code coverage
         run: cargo +nightly llvm-cov nextest
           --all-features --workspace
-          --ignore-filename-regex jpegxl-sys/
+          --ignore-filename-regex vapoursynth-sys/
           --lcov --output-path lcov.info
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -50,6 +67,7 @@ jobs:
           fail_ci_if_error: true
 
   sanitizer:
+    needs: [build-vs]
     name: Sanitizers
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -57,6 +75,11 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: Install VapourSynth
+        uses: rlaphoenix/install-vapoursynth-action@v2.1.1
+        with:
+          version: 66
+          cache: true
       - name: Install Rust
         run: rustup update nightly
       - name: Add rust-src
@@ -118,3 +141,17 @@ jobs:
         run: rustup update stable
       - name: Format check
         run: cargo fmt --all -- --check
+
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: rustup update ${{ matrix.rust }} --no-self-update && rustup default ${{ matrix.rust }}
+      - run: cargo check --all --all-features --all-targets
+      - run: cargo build
