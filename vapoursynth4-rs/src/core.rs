@@ -13,14 +13,13 @@ use std::{
 };
 
 use crate::{
-    api, ffi,
-    frame::Frame,
-    frame::{AudioFormat, AudioFrame, VideoFormat, VideoFrame},
+    api::{api, error::ApiNotFound, API},
+    ffi,
+    frame::{AudioFormat, AudioFrame, Frame, VideoFormat, VideoFrame},
     function::Function,
     map::MapMut,
     node::{internal::FilterExtern, Dependencies, Filter},
-    plugin::Plugin,
-    plugin::Plugins,
+    plugin::{Plugin, Plugins},
     AudioInfo, ColorFamily, SampleType, VideoInfo,
 };
 
@@ -62,16 +61,18 @@ pub struct Core {
 }
 
 impl Core {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::new_with(0)
+    /// # Errors
+    ///
+    /// Return [`ApiNotFound`] if the default API is not valid.
+    pub fn new() -> Result<Self, ApiNotFound> {
+        unsafe { crate::api::Api::default().map(|api| Self::new_with(0, api)) }
     }
 
-    fn new_with(flags: i32) -> Self {
-        let core = unsafe { (api().createCore)(flags) };
+    unsafe fn new_with(flags: i32, vsapi: *const ffi::VSAPI) -> Self {
+        API.set(vsapi);
+        let core = unsafe { ((*vsapi).createCore)(flags) };
         Self {
-            // Safety: `core` is always a valid pointer to a `VSCore` instance.
-            handle: unsafe { NonNull::new_unchecked(core) },
+            handle: NonNull::new_unchecked(core),
         }
     }
 
@@ -369,12 +370,6 @@ impl Core {
     }
 }
 
-impl Default for Core {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Drop for Core {
     fn drop(&mut self) {
         unsafe {
@@ -388,6 +383,7 @@ pub struct CoreBuilder {
     flags: i32,
     max_cache_size: Option<i64>,
     thread_count: Option<i32>,
+    api: Option<*const ffi::VSAPI>,
 }
 
 impl CoreBuilder {
@@ -396,16 +392,31 @@ impl CoreBuilder {
         Self::default()
     }
 
-    #[must_use]
-    pub fn build(self) -> Core {
-        let mut core = Core::new_with(self.flags);
+    /// # Errors
+    ///
+    /// Return [`ApiNotFound`] if the default API is not valid.
+    pub fn build(self) -> Result<Core, ApiNotFound> {
+        let api = match self.api {
+            Some(api) => api,
+            None => crate::api::Api::default()?,
+        };
+
+        let mut core = unsafe { Core::new_with(self.flags, api) };
         if let Some(size) = self.max_cache_size {
             core.set_max_cache_size(size);
         }
         if let Some(count) = self.thread_count {
             core.set_thread_count(count);
         }
-        core
+
+        Ok(core)
+    }
+
+    /// # Safety
+    /// `ptr` must be a valid pointer to the [`ffi::VSAPI`] struct.
+    pub unsafe fn api(&mut self, ptr: *const ffi::VSAPI) -> &mut Self {
+        self.api = Some(ptr);
+        self
     }
 
     pub fn enable_graph_inspection(&mut self) -> &mut Self {
@@ -438,21 +449,17 @@ impl CoreBuilder {
 mod tests {
     use testresult::TestResult;
 
-    use crate::set_api_default;
-
     use super::*;
 
     #[test]
     fn builder() -> TestResult {
-        set_api_default()?;
-
         let core = CoreBuilder::new()
             .enable_graph_inspection()
             .disable_auto_loading()
             .disable_library_unloading()
             .max_cache_size(1024)
             .thread_count(4)
-            .build();
+            .build()?;
         assert_eq!(core.get_info().max_framebuffer_size, 1024);
         assert_eq!(core.get_info().num_threads, 4);
 

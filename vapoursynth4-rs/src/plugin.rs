@@ -4,7 +4,7 @@ pub mod types;
 use std::{ffi::CStr, ptr::NonNull};
 
 use crate::{
-    api,
+    api::api,
     core::Core,
     ffi,
     map::{Map, MapRef},

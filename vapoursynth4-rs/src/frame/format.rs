@@ -1,6 +1,6 @@
 use std::{ffi::CStr, fmt::Display};
 
-use crate::{api, ffi};
+use crate::{api::api, ffi};
 
 pub type VideoFormat = ffi::VSVideoFormat;
 pub type AudioFormat = ffi::VSAudioFormat;

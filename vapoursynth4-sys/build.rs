@@ -9,7 +9,7 @@ fn main() {
     {
         use std::env;
 
-        const LIBRARY_DIR_VARIABLE: &str = "VAPOURSYNTH_LIB_DIR";
+        const LIBRARY_DIR_VARIABLE: &str = "VAPOURSYNTH_LIB_PATH";
 
         // Make sure the build script is re-run if our env variable is changed.
         println!("cargo:rerun-if-env-changed={}", LIBRARY_DIR_VARIABLE);
@@ -20,6 +20,8 @@ fn main() {
 
         // Handle linking to VapourSynth libs.
         println!("cargo:rustc-link-lib=vapoursynth");
+
+        #[cfg(feature = "vsscript")]
         println!("cargo:rustc-link-lib=vapoursynth-script");
     }
 }
