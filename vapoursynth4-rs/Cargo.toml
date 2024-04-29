@@ -17,7 +17,7 @@ vapoursynth4-sys = {version = "0.2.0", path = "../vapoursynth4-sys"}
 
 [dev-dependencies]
 const-str = "0.5.6"
-testresult = "0.3.0"
+testresult = "0.4.0"
 
 [features]
 link-library = ["vapoursynth4-sys/link-library"]
