@@ -2,15 +2,13 @@
 
 set -euxo pipefail
 
-env | sort
-
-if [ "$RUNNER_OS" == "macOS" ]; then
-    brew install zimg automake libtool
-fi
-
 PREFIX="$PWD/vapoursynth-build"
 
 if [ ! -d "$PREFIX" ]; then
+    if [ "$RUNNER_OS" == "macOS" ]; then
+        brew install zimg automake libtool
+    fi
+
     pip install Cython
 
     git clone --depth 1 --branch release-3.0.5 --recursive --shallow-submodules \
@@ -28,8 +26,6 @@ if [ ! -d "$PREFIX" ]; then
     make -j"$(nproc)"
     make install
 fi
-
-ls -lR "$PREFIX"
 
 if [ "$RUNNER_OS" == "Linux" ]; then
     sudo sh -c "echo $PREFIX/lib > /etc/ld.so.conf.d/vapoursynth.conf"

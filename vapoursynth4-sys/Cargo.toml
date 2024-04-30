@@ -30,3 +30,7 @@ default = ["vsscript", "vsscript-41", "vs-graph"]
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+
+[lints.clippy]
+pedantic = "warn"
