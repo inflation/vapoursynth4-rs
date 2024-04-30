@@ -643,6 +643,7 @@ pub enum MapPropertyError {
 pub type AppendMode = ffi::VSMapAppendMode;
 
 #[cfg(test)]
+#[cfg(feature = "link-library")]
 mod tests {
     use core::panic;
 

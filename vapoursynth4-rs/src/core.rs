@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::{
-    api::{api, error::ApiNotFound, API},
+    api::{api, error::ApiNotSet, Api, API},
     ffi,
     frame::{AudioFormat, AudioFrame, Frame, VideoFormat, VideoFrame},
     function::Function,
@@ -61,13 +61,6 @@ pub struct Core {
 }
 
 impl Core {
-    /// # Errors
-    ///
-    /// Return [`ApiNotFound`] if the default API is not valid.
-    pub fn new() -> Result<Self, ApiNotFound> {
-        unsafe { crate::api::Api::default().map(|api| Self::new_with(0, api)) }
-    }
-
     unsafe fn new_with(flags: i32, vsapi: *const ffi::VSAPI) -> Self {
         API.set(vsapi);
         let core = unsafe { ((*vsapi).createCore)(flags) };
@@ -378,15 +371,15 @@ impl Drop for Core {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
-pub struct CoreBuilder {
+#[derive(Debug, Default)]
+pub struct CoreBuilder<'api> {
     flags: i32,
     max_cache_size: Option<i64>,
     thread_count: Option<i32>,
-    api: Option<*const ffi::VSAPI>,
+    api: Option<&'api Api>,
 }
 
-impl CoreBuilder {
+impl<'api> CoreBuilder<'api> {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -394,14 +387,13 @@ impl CoreBuilder {
 
     /// # Errors
     ///
-    /// Return [`ApiNotFound`] if the default API is not valid.
-    pub fn build(self) -> Result<Core, ApiNotFound> {
-        let api = match self.api {
-            Some(api) => api,
-            None => crate::api::Api::default()?,
+    /// Return [`ApiNotSet`] if the API is not set.
+    pub fn build(&mut self) -> Result<Core, ApiNotSet> {
+        let Some(api) = self.api else {
+            return Err(ApiNotSet {});
         };
 
-        let mut core = unsafe { Core::new_with(self.flags, api) };
+        let mut core = unsafe { Core::new_with(self.flags, api.into()) };
         if let Some(size) = self.max_cache_size {
             core.set_max_cache_size(size);
         }
@@ -412,10 +404,8 @@ impl CoreBuilder {
         Ok(core)
     }
 
-    /// # Safety
-    /// `ptr` must be a valid pointer to the [`ffi::VSAPI`] struct.
-    pub unsafe fn api(&mut self, ptr: *const ffi::VSAPI) -> &mut Self {
-        self.api = Some(ptr);
+    pub fn api(&mut self, api: &'api Api) -> &mut Self {
+        self.api = Some(api);
         self
     }
 
@@ -446,20 +436,26 @@ impl CoreBuilder {
 }
 
 #[cfg(test)]
+#[cfg(feature = "link-library")]
 mod tests {
+    use std::ptr::addr_of;
     use testresult::TestResult;
 
     use super::*;
 
     #[test]
     fn builder() -> TestResult {
-        let core = CoreBuilder::new()
-            .enable_graph_inspection()
-            .disable_auto_loading()
-            .disable_library_unloading()
-            .max_cache_size(1024)
-            .thread_count(4)
-            .build()?;
+        unsafe { API.set_default() }?;
+        let core = unsafe {
+            CoreBuilder::new()
+                .api(&*addr_of!(API))
+                .enable_graph_inspection()
+                .disable_auto_loading()
+                .disable_library_unloading()
+                .max_cache_size(1024)
+                .thread_count(4)
+                .build()?
+        };
         assert_eq!(core.get_info().max_framebuffer_size, 1024);
         assert_eq!(core.get_info().num_threads, 4);
 
