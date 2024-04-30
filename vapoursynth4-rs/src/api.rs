@@ -8,6 +8,8 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 
 use crate::ffi;
 
+#[cfg(test)]
+#[cfg(feature = "link-library")]
 use self::error::ApiNotFound;
 
 pub(crate) static mut API: Api = Api::null();
@@ -17,7 +19,8 @@ pub(crate) fn api() -> &'static ffi::VSAPI {
 }
 
 #[repr(transparent)]
-pub(crate) struct Api {
+#[derive(Debug)]
+pub struct Api {
     handle: AtomicPtr<ffi::VSAPI>,
 }
 
@@ -28,7 +31,13 @@ impl Api {
         }
     }
 
-    pub(crate) fn default() -> Result<*const ffi::VSAPI, ApiNotFound> {
+    pub(crate) fn set(&mut self, ptr: *const ffi::VSAPI) {
+        self.handle.store(ptr.cast_mut(), Ordering::Release);
+    }
+
+    #[cfg(test)]
+    #[cfg(feature = "link-library")]
+    pub(crate) fn set_default(&mut self) -> Result<(), ApiNotFound> {
         let ptr = unsafe { ffi::getVapourSynthAPI(ffi::VAPOURSYNTH_API_VERSION) };
         if ptr.is_null() {
             Err(ApiNotFound {
@@ -36,17 +45,15 @@ impl Api {
                 minor: ffi::VAPOURSYNTH_API_MINOR,
             })
         } else {
-            Ok(ptr)
+            self.set(ptr);
+            Ok(())
         }
     }
+}
 
-    pub(crate) fn set(&mut self, ptr: *const ffi::VSAPI) {
-        self.handle.store(ptr.cast_mut(), Ordering::Release);
-    }
-
-    #[cfg(test)]
-    pub(crate) fn set_default(&mut self) -> Result<(), ApiNotFound> {
-        Self::default().map(|api| self.set(api))
+impl From<&Api> for *const ffi::VSAPI {
+    fn from(api: &Api) -> *const ffi::VSAPI {
+        api.handle.load(Ordering::Acquire)
     }
 }
 
@@ -62,4 +69,8 @@ pub mod error {
         pub major: u16,
         pub minor: u16,
     }
+
+    #[derive(Error, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[error("API is not set")]
+    pub struct ApiNotSet {}
 }
