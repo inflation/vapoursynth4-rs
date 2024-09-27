@@ -7,7 +7,7 @@ use crate::{
     core::CoreRef,
     ffi,
     frame::{Frame, FrameContext},
-    map::{MapMut, MapRef},
+    map::MapRef,
     node::FilterMode,
 };
 
@@ -30,8 +30,8 @@ where
     /// Return [`Self::Error`] if anything happens during the filter creation.
     /// The error message will be passed to `VapourSynth`.
     fn create(
-        input: MapRef<'_>,
-        output: MapMut<'_>,
+        input: &MapRef,
+        output: &mut MapRef,
         data: Option<Box<Self::FilterData>>,
         core: CoreRef,
     ) -> Result<(), Self::Error>;

@@ -54,7 +54,8 @@ impl Plugin {
     }
 
     #[must_use]
-    pub fn invoke(&self, name: &CStr, args: MapRef<'_>) -> Map {
+    pub fn invoke(&self, name: &CStr, args: &MapRef) -> Map {
+        debug_assert!(!args.as_ptr().is_null());
         unsafe {
             let ptr = (api().invoke)(self.as_ptr().cast_mut(), name.as_ptr(), args.as_ptr());
             Map::from_ptr(ptr)
