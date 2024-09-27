@@ -6,11 +6,7 @@
 
 use std::ptr::NonNull;
 
-use crate::{
-    api::api,
-    ffi,
-    map::{MapMut, MapRef},
-};
+use crate::{api::api, ffi, map::MapRef};
 
 mod context;
 mod format;
@@ -26,18 +22,18 @@ pub trait Frame: Sized + internal::FrameFromPtr {
     fn as_mut_ptr(&mut self) -> *mut ffi::VSFrame;
 
     #[must_use]
-    fn properties(&self) -> Option<MapRef<'_>> {
+    fn properties(&self) -> Option<&MapRef> {
         unsafe {
             let ptr = (api().getFramePropertiesRO)(self.as_ptr());
-            NonNull::new(ptr.cast_mut()).map(MapRef::new)
+            NonNull::new(ptr.cast_mut()).map(|x| MapRef::from_ptr(x.as_ptr()))
         }
     }
 
     #[must_use]
-    fn properties_mut(&mut self) -> Option<MapMut<'_>> {
+    fn properties_mut(&mut self) -> Option<&mut MapRef> {
         unsafe {
             let ptr = (api().getFramePropertiesRW)(self.as_mut_ptr());
-            NonNull::new(ptr).map(MapMut::new)
+            NonNull::new(ptr).map(|x| MapRef::from_ptr_mut(x.as_ptr()))
         }
     }
 }
