@@ -1,4 +1,6 @@
 use std::{
+    borrow::{Borrow, BorrowMut},
+    cell::UnsafeCell,
     ffi::{c_char, c_int, CStr},
     marker::PhantomData,
     mem::ManuallyDrop,
@@ -19,107 +21,48 @@ use crate::{
 mod key;
 pub use key::*;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct MapMut<'m> {
-    handle: NonNull<ffi::VSMap>,
-    _marker: PhantomData<&'m mut Map>,
-}
+/// Opaque type.
+struct Opaque(PhantomData<UnsafeCell<*mut ()>>);
 
-impl<'m> MapMut<'m> {
-    #[must_use]
-    pub fn new(handle: NonNull<ffi::VSMap>) -> Self {
-        Self {
-            handle,
-            _marker: PhantomData,
-        }
-    }
-
-    #[must_use]
-    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSMap) -> MapMut<'m> {
-        MapMut {
-            handle: NonNull::new_unchecked(ptr),
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'m> Deref for MapMut<'m> {
-    type Target = Map;
-
-    fn deref(&self) -> &'m Self::Target {
-        unsafe { &*(self as *const Self).cast::<Map>() }
-    }
-}
-
-impl<'m> DerefMut for MapMut<'m> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *(self as *mut Self).cast::<Map>() }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+/// A borrowed reference to a [`ffi::VSMap`].
 #[repr(transparent)]
-pub struct MapRef<'m> {
-    handle: NonNull<ffi::VSMap>,
-    _marker: PhantomData<&'m Map>,
-}
+pub struct MapRef(Opaque);
 
-impl<'m> MapRef<'m> {
-    #[must_use]
-    pub fn new(handle: NonNull<ffi::VSMap>) -> Self {
-        Self {
-            handle,
-            _marker: PhantomData,
-        }
+impl MapRef {
+    /// Constructs a shared instance of this type from its raw type.
+    ///     
+    /// # Safety
+    ///
+    /// `ptr` must be a valid, immutable, instance of the type for the `'a`
+    /// lifetime.
+    #[inline]
+    pub(crate) unsafe fn from_ptr<'a>(ptr: *const ffi::VSMap) -> &'a Self {
+        debug_assert!(!ptr.is_null());
+        &*(ptr as *mut _)
     }
 
-    #[must_use]
-    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSMap) -> MapRef<'m> {
-        MapRef {
-            handle: NonNull::new_unchecked(ptr.cast_mut()),
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'m> Deref for MapRef<'m> {
-    type Target = Map;
-
-    fn deref(&self) -> &'m Self::Target {
-        unsafe { &*(self as *const Self).cast::<Map>() }
-    }
-}
-
-#[derive(PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
-pub struct Map {
-    handle: NonNull<ffi::VSMap>,
-}
-
-impl Map {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            // safety: `api.createMap` always returns a valid pointer
-            handle: unsafe { NonNull::new_unchecked((api().createMap)()) },
-        }
+    /// Constructs a mutable reference of this type from its raw type.
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must be a valid, unique, instance of the type for the `'a`
+    /// lifetime.
+    #[inline]
+    pub(crate) unsafe fn from_ptr_mut<'a>(ptr: *mut ffi::VSMap) -> &'a mut Self {
+        debug_assert!(!ptr.is_null());
+        &mut *(ptr as *mut _)
     }
 
-    #[must_use]
-    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSMap) -> Self {
-        Self {
-            handle: NonNull::new_unchecked(ptr),
-        }
+    /// Returns a raw pointer to the wrapped value.
+    #[inline]
+    pub(crate) fn as_ptr(&self) -> *mut ffi::VSMap {
+        self as *const _ as *mut _
     }
 
-    #[must_use]
-    pub fn as_ptr(&self) -> *const ffi::VSMap {
-        self.handle.as_ptr()
-    }
-
-    #[must_use]
-    pub fn as_mut_ptr(&mut self) -> *mut ffi::VSMap {
-        self.handle.as_ptr()
+    /// Returns a raw pointer to the wrapped value.
+    #[inline]
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::VSMap {
+        self as *mut _ as *mut _
     }
 
     pub fn clear(&mut self) {
@@ -567,6 +510,84 @@ impl Map {
     }
 }
 
+/// An owned [`ffi::VSMap`].
+#[derive(PartialEq, Eq, Hash, Debug)]
+#[repr(transparent)]
+pub struct Map {
+    handle: NonNull<ffi::VSMap>,
+}
+
+impl Map {
+    #[must_use]
+    pub fn new() -> Self {
+        // safety: `api.createMap` always returns a valid pointer
+        unsafe { Self::from_ptr((api().createMap)()) }
+    }
+
+    /// Constructs an instance of this type from its raw type.
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must be a valid, owned instance of the native type.
+    #[must_use]
+    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSMap) -> Self {
+        debug_assert!(!ptr.is_null());
+        Self {
+            handle: NonNull::new_unchecked(ptr),
+        }
+    }
+
+    /// Returns a raw pointer to the wrapped value.
+    #[must_use]
+    pub fn as_ptr(&self) -> *const ffi::VSMap {
+        self.handle.as_ptr()
+    }
+
+    /// Returns a raw pointer to the wrapped value.
+    #[must_use]
+    pub fn as_mut_ptr(&mut self) -> *mut ffi::VSMap {
+        self.handle.as_ptr()
+    }
+}
+
+impl Deref for Map {
+    type Target = MapRef;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { MapRef::from_ptr(self.as_ptr()) }
+    }
+}
+
+impl DerefMut for Map {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { MapRef::from_ptr_mut(self.as_mut_ptr()) }
+    }
+}
+
+impl Borrow<MapRef> for Map {
+    fn borrow(&self) -> &MapRef {
+        self
+    }
+}
+
+impl BorrowMut<MapRef> for Map {
+    fn borrow_mut(&mut self) -> &mut MapRef {
+        self
+    }
+}
+
+impl AsRef<MapRef> for Map {
+    fn as_ref(&self) -> &MapRef {
+        self
+    }
+}
+
+impl AsMut<MapRef> for Map {
+    fn as_mut(&mut self) -> &mut MapRef {
+        self
+    }
+}
+
 impl Drop for Map {
     fn drop(&mut self) {
         // safety: `self.handle` is a valid pointer
@@ -653,6 +674,26 @@ mod tests {
     use crate::api::API;
 
     use super::*;
+
+    #[test]
+    fn refs_and_derefs() -> TestResult {
+        unsafe { API.set_default()? };
+
+        let mut map = Map::default();
+        let ptr = map.as_mut_ptr();
+
+        unsafe {
+            assert_eq!(map.deref().as_ptr(), ptr);
+            assert_eq!(map.deref_mut().as_ptr(), ptr);
+            assert_eq!(map.as_ref().as_ptr(), ptr);
+            assert_eq!(map.as_mut().as_ptr(), ptr);
+
+            assert_eq!(MapRef::from_ptr(ptr).as_ptr(), ptr);
+            assert_eq!(MapRef::from_ptr_mut(ptr).as_ptr(), ptr);
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn clear() -> TestResult {

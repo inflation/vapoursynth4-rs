@@ -17,7 +17,7 @@ use crate::{
     ffi,
     frame::{AudioFormat, AudioFrame, Frame, VideoFormat, VideoFrame},
     function::Function,
-    map::MapMut,
+    map::MapRef,
     node::{internal::FilterExtern, Dependencies, Filter},
     plugin::{Plugin, Plugins},
     AudioInfo, ColorFamily, SampleType, VideoInfo,
@@ -105,15 +105,16 @@ impl Core {
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_video_filter<F: Filter>(
         &mut self,
-        mut out: MapMut<'_>,
+        out: &mut MapRef,
         name: &CStr,
         info: &VideoInfo,
         filter: Box<F>,
         dependencies: &Dependencies,
     ) {
+        debug_assert!(!out.as_ptr().is_null());
         unsafe {
             (api().createVideoFilter)(
-                (*out).as_mut_ptr(),
+                out.as_mut_ptr(),
                 name.as_ptr(),
                 info,
                 F::filter_get_frame,
@@ -132,7 +133,7 @@ impl Core {
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_audio_filter<F: Filter>(
         &mut self,
-        mut out: MapMut<'_>,
+        out: &mut MapRef,
         name: &CStr,
         info: &AudioInfo,
         filter: F,

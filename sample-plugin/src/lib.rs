@@ -1,12 +1,15 @@
+mod dither;
+
 use std::ffi::{c_void, CStr};
 
 use const_str::cstr;
+use dither::DitherFilter;
 use vapoursynth4_rs::{
     core::CoreRef,
     declare_plugin,
     frame::{FrameContext, VideoFrame},
     key,
-    map::{MapMut, MapRef},
+    map::MapRef,
     node::{
         ActivationReason, Dependencies, Filter, FilterDependency, Node, RequestPattern, VideoNode,
     },
@@ -24,8 +27,8 @@ impl Filter for DumbFilter {
     type FilterData = ();
 
     fn create(
-        input: MapRef<'_>,
-        output: MapMut<'_>,
+        input: &MapRef,
+        output: &mut MapRef,
         _data: Option<Box<Self::FilterData>>,
         mut core: CoreRef,
     ) -> Result<(), Self::Error> {
@@ -132,5 +135,6 @@ declare_plugin!(
     (1, 0),
     vapoursynth4_rs::VAPOURSYNTH_API_VERSION,
     0,
-    (DumbFilter, None)
+    (DumbFilter, None),
+    (DitherFilter, None)
 );

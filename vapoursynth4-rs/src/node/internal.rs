@@ -9,7 +9,7 @@ use crate::{
     api::API,
     core::CoreRef,
     frame::{Frame, FrameContext},
-    map::{MapMut, MapRef},
+    map::MapRef,
     utils::ToCString,
 };
 
@@ -26,7 +26,7 @@ pub trait FilterExtern: Filter {
         API.set(vsapi);
 
         let input = MapRef::from_ptr(in_);
-        let mut output = MapMut::from_ptr(out);
+        let output = MapRef::from_ptr_mut(out);
         let core = CoreRef::from_ptr(core);
         let data = if user_data.is_null() {
             None
