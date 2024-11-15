@@ -149,7 +149,7 @@ jobs:
         env:
           VAPOURSYNTH_LIB_PATH: vapoursynth-build/lib
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info

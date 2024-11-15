@@ -1,2 +1,5 @@
+.cargo/
+.vscode/
+vapoursynth/
 /target
 Cargo.lock
