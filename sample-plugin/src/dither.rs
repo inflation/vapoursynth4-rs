@@ -1,6 +1,5 @@
 use std::ffi::{c_void, CStr};
 
-use const_str::cstr;
 use vapoursynth4_rs::{
     core::CoreRef,
     frame::{FrameContext, VideoFrame},
@@ -29,31 +28,31 @@ impl Filter for DitherFilter {
         _data: Option<Box<Self::FilterData>>,
         mut core: CoreRef,
     ) -> Result<(), Self::Error> {
-        let Ok(node) = input.get_video_node(key!("clip"), 0) else {
-            return Err(cstr!("Failed to get clip"));
+        let Ok(node) = input.get_video_node(key!(c"clip"), 0) else {
+            return Err(c"Failed to get clip");
         };
 
         // Input parameters.
-        let bits = input.get_int_saturated(key!("bits"), 0).unwrap_or(16);
+        let bits = input.get_int_saturated(key!(c"bits"), 0).unwrap_or(16);
 
         // Use fmtconv to dither to the desired bit depth.
-        let Some(fmtc_plugin) = core.get_plugin_by_namespace(cstr!("fmtc")) else {
-            return Err(cstr!("Failed to find the fmtconv plugin."));
+        let Some(fmtc_plugin) = core.get_plugin_by_namespace(c"fmtc") else {
+            return Err(c"Failed to find the fmtconv plugin.");
         };
         let mut args = Map::new();
         args.set(
-            key!("clip"),
+            key!(c"clip"),
             Value::VideoNode(node.clone()),
             AppendMode::Replace,
         )
         .unwrap();
-        args.set(key!("bits"), Value::Int(bits as i64), AppendMode::Replace)
+        args.set(key!(c"bits"), Value::Int(bits as i64), AppendMode::Replace)
             .unwrap();
-        args.set(key!("dmode"), Value::Int(8), AppendMode::Replace)
+        args.set(key!(c"dmode"), Value::Int(8), AppendMode::Replace)
             .unwrap();
-        let ret = fmtc_plugin.invoke(cstr!("bitdepth"), &args);
-        let Ok(dithered_node) = ret.get_video_node(key!("clip"), 0) else {
-            return Err(cstr!("Failed to dither the clip."));
+        let ret = fmtc_plugin.invoke(c"bitdepth", &args);
+        let Ok(dithered_node) = ret.get_video_node(key!(c"clip"), 0) else {
+            return Err(c"Failed to dither the clip.");
         };
 
         // Update output info to reflect the new bit depth.
@@ -77,7 +76,7 @@ impl Filter for DitherFilter {
 
         core.create_video_filter(
             output,
-            cstr!("Depth"),
+            c"Depth",
             &vi,
             Box::new(filter),
             Dependencies::new(&deps).unwrap(),
@@ -114,7 +113,7 @@ impl Filter for DitherFilter {
         Ok(None)
     }
 
-    const NAME: &'static CStr = cstr!("Depth");
-    const ARGS: &'static CStr = cstr!("clip:vnode;bits:int:opt;");
-    const RETURN_TYPE: &'static CStr = cstr!("clip:vnode;");
+    const NAME: &'static CStr = c"Depth";
+    const ARGS: &'static CStr = c"clip:vnode;bits:int:opt;";
+    const RETURN_TYPE: &'static CStr = c"clip:vnode;";
 }

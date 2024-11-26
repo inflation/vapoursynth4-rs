@@ -44,13 +44,13 @@ impl<'c> Deref for CoreRef<'c> {
     type Target = Core;
 
     fn deref(&self) -> &'c Self::Target {
-        unsafe { &*(self as *const CoreRef<'c>).cast() }
+        unsafe { &*std::ptr::from_ref::<CoreRef<'c>>(self).cast() }
     }
 }
 
 impl<'c> DerefMut for CoreRef<'c> {
     fn deref_mut(&mut self) -> &'c mut Self::Target {
-        unsafe { &mut *(self as *mut CoreRef<'c>).cast() }
+        unsafe { &mut *std::ptr::from_mut::<CoreRef<'c>>(self).cast() }
     }
 }
 

@@ -528,7 +528,7 @@ pub enum VSRequestPattern {
     /// [`VSRequestPattern::General`]) and not any of the other modes.
     General = 0,
     /// Will only request an input frame at most once if all output frames are requested
-    /// exactly one time. This includes filters such as Trim, Reverse, SelectEvery.
+    /// exactly one time. This includes filters such as Trim, Reverse, `SelectEvery`.
     NoFrameReuse = 1,
     /// Only requests frame N to output frame N. The main difference to
     /// [`VSRequestPattern::NoFrameReuse`] is that the requested frame
@@ -603,7 +603,7 @@ pub type VSPublicFunction = unsafe extern "system" fn(
 ///     [`registerFunction`](VSPLUGINAPI::registerFunction) for each function to export.
 pub type VSInitPlugin =
     unsafe extern "system" fn(plugin: *mut VSPlugin, vspapi: *const VSPLUGINAPI);
-///
+/// Free function type
 pub type VSFreeFunctionData = Option<unsafe extern "system" fn(userData: *mut c_void)>;
 /// A filter's "getFrame" function. It is called by the core when it needs the filter
 /// to generate a frame.
@@ -726,7 +726,7 @@ pub struct VSPLUGINAPI {
     /// If you don't know the specific `apiVersion` you actually require simply pass
     /// [`VAPOURSYNTH_API_VERSION`] to match the header version
     /// you're compiling against. The flags consist of values from
-    /// [`VSPluginConfigFlags`] ORed together but should for most plugins typically be 0.
+    /// [`VSPluginConfigFlags`] `ORed` together but should for most plugins typically be 0.
     ///
     /// Returns non-zero on success.
     pub configPlugin: unsafe extern "system" fn(
@@ -971,7 +971,7 @@ pub struct VSAPI {
     ///
     /// * `planeSrc` - Array of frames from which planes will be copied.
     ///     If any elements of the array are `NULL`, the corresponding planes in the new frame
-    /// will contain uninitialised memory.
+    ///     will contain uninitialised memory.
     ///
     /// * `planes` - Array of plane numbers indicating which plane to copy from
     ///     the corresponding source frame.
@@ -1163,7 +1163,7 @@ pub struct VSAPI {
     ///
     ///     ## Note
     ///     
-    ///     RGB formats are not allowed to be subsampled in VapourSynth.
+    ///     RGB formats are not allowed to be subsampled in `VapourSynth`.
     ///
     /// Returns non-zero on success.
     pub queryVideoFormat: unsafe extern "system" fn(
@@ -1224,7 +1224,7 @@ pub struct VSAPI {
     ///
     ///     ## Note
     ///     
-    ///     RGB formats are not allowed to be subsampled in VapourSynth.
+    ///     RGB formats are not allowed to be subsampled in `VapourSynth`.
     ///
     /// Returns a valid format id if the provided arguments are valid, on error 0 is returned.
     pub queryVideoFormatID: unsafe extern "system" fn(
@@ -1235,7 +1235,7 @@ pub struct VSAPI {
         subSamplingH: c_int,
         core: *mut VSCore,
     ) -> u32,
-    /// Fills out the VSVideoFormat struct passed to format based
+    /// Fills out the `VSVideoFormat` struct passed to format based
     ///
     /// # Arguments
     ///
@@ -1285,7 +1285,7 @@ pub struct VSAPI {
     /// a user-provided function is called.
     /// Note that the completion callback will only be called from a single thread at a time.
     ///
-    /// This function is meant for applications using VapourSynth as a library.
+    /// This function is meant for applications using `VapourSynth` as a library.
     ///
     /// Thread-safe.
     ///
@@ -1482,7 +1482,7 @@ pub struct VSAPI {
     /// Returns the number on success, or 0 in case of error.
     ///
     /// If the map has an error set (i.e. if [`mapGetError()`](VSAPI::mapGetError)
-    /// returns non-`NULL`), VapourSynth will die with a fatal error.
+    /// returns non-`NULL`), `VapourSynth` will die with a fatal error.
     ///
     /// # Arguments
     ///
@@ -1495,7 +1495,7 @@ pub struct VSAPI {
     ///     on success.
     ///
     ///     You may pass `NULL` here, but then any problems encountered while retrieving
-    ///     the property will cause VapourSynth to die with a fatal error.
+    ///     the property will cause `VapourSynth` to die with a fatal error.
     pub mapGetInt: unsafe extern "system" fn(
         map: *const VSMap,
         key: *const c_char,
@@ -1558,7 +1558,7 @@ pub struct VSAPI {
     /// * `i` - Pointer to the first element of the array to store.
     ///
     /// * `size` - Number of integers to read from the array. It can be 0, in which case
-    /// no integers are read from the array, and the property will be created empty.
+    ///     no integers are read from the array, and the property will be created empty.
     ///
     /// Returns 0 on success, or 1 if size is negative.
     pub mapSetIntArray: unsafe extern "system" fn(
@@ -1836,13 +1836,13 @@ pub struct VSAPI {
     /// * `name` - Filter name. The characters allowed are letters, numbers, and the underscore.
     ///     The first character must be a letter. In other words: ^[a-zA-Z][a-zA-Z0-9_]*$
     ///
-    ///     Filter names _should be_ PascalCase.
+    ///     Filter names _should be_ `PascalCase`.
     ///
     /// * `args` - String containing the filter's list of arguments.
     ///
     ///     Arguments are separated by a semicolon. Each argument is made of several fields
     ///     separated by a colon. Don't insert additional whitespace characters,
-    ///     or VapourSynth will die.
+    ///     or `VapourSynth` will die.
     ///
     ///     ## Fields:
     ///
@@ -1853,7 +1853,7 @@ pub struct VSAPI {
     ///
     ///     * The type.
     ///
-    ///         * "int": int64_t
+    ///         * "int": `int64_t`
     ///         * "float": double
     ///         * "data": const char*
     ///         * "anode": const [`VSNode`]* (audio type)
@@ -1940,7 +1940,7 @@ pub struct VSAPI {
     ///
     /// # Arguments
     ///
-    /// * `plugin` - Current plugin. Pass `NULLw to get the first plugin.
+    /// * `plugin` - Current plugin. Pass `NULL` to get the first plugin.
     ///
     /// Returns a pointer to the next plugin in order or
     /// `NULL` if the final plugin has been reached.
@@ -1991,7 +1991,7 @@ pub struct VSAPI {
     ///
     /// Path elements are always delimited with forward slashes.
     ///
-    /// VapourSynth retains ownership of the returned pointer.
+    /// `VapourSynth` retains ownership of the returned pointer.
     pub getPluginPath: unsafe extern "system" fn(plugin: *const VSPlugin) -> *const c_char,
     /// Returns the version of the plugin.
     /// This is the same as the version number passed to
@@ -2031,13 +2031,13 @@ pub struct VSAPI {
     // !SECTION
 
     // SECTION - Core and information
-    /// Creates the VapourSynth processing core and returns a pointer to it.
+    /// Creates the `VapourSynth` processing core and returns a pointer to it.
     /// It is possible to create multiple cores but in most cases it shouldn't be needed.
     ///
     /// # Arguments
     ///
-    /// * `flags` - [`VSCoreCreationFlags`] ORed together if desired.
-    /// Pass 0 for sane defaults that should suit most uses.
+    /// * `flags` - [`VSCoreCreationFlags`] `ORed` together if desired.
+    ///    Pass 0 for sane defaults that should suit most uses.
     ///
     pub createCore: unsafe extern "system" fn(flags: c_int) -> *mut VSCore,
 
@@ -2059,7 +2059,7 @@ pub struct VSAPI {
     /// Returns the number of threads that will be used for processing.
     pub setThreadCount: unsafe extern "system" fn(threads: c_int, core: *mut VSCore) -> c_int,
 
-    /// Returns information about the VapourSynth core.
+    /// Returns information about the `VapourSynth` core.
     pub getCoreInfo: unsafe extern "system" fn(core: *mut VSCore, info: *mut VSCoreInfo),
 
     /// Returns the highest [`VAPOURSYNTH_API_VERSION`]
@@ -2068,19 +2068,19 @@ pub struct VSAPI {
     // !SECTION
 
     // SECTION - Message handler
-    /// Send a message through VapourSynth's logging framework.
+    /// Send a message through `VapourSynth`'s logging framework.
     /// See [`addLogHandler`](Self::addLogHandler).
     ///
     /// # Arguments
     /// * `msgType` - The type of message. One of [`VSMessageType`].
     ///
     ///     If `msgType` is [`VSMessageType::Fatal`],
-    ///     VapourSynth will call `abort()` after delivering the message.
+    ///     `VapourSynth` will call `abort()` after delivering the message.
     ///
     /// * `msg` - The message.
     pub logMessage:
         unsafe extern "system" fn(msgType: VSMessageType, msg: *const c_char, core: *mut VSCore),
-    /// Installs a custom handler for the various error messages VapourSynth emits.
+    /// Installs a custom handler for the various error messages `VapourSynth` emits.
     /// The message handler is per [`VSCore`] instance. Returns a unique handle.
     ///
     /// If no log handler is installed up to a few hundred messages are cached and
@@ -2149,7 +2149,7 @@ extern "system" {
     /// Returns a pointer to the global [`VSAPI`] instance.
     ///
     /// Returns `NULL` if the requested API version is not supported or
-    /// if the system does not meet the minimum requirements to run VapourSynth.
+    /// if the system does not meet the minimum requirements to run `VapourSynth`.
     /// It is recommended to pass [`VAPOURSYNTH_API_VERSION`]
     pub fn getVapourSynthAPI(version: c_int) -> *const VSAPI;
 }
