@@ -54,7 +54,7 @@ pub struct VSSCRIPTAPI {
     /// Retrieves the [`VSAPI`] struct. Exists mostly as a convenience so
     /// the vapoursynth module doesn’t have to be explicitly loaded.
     ///
-    /// This could return `NULL` if the VapourSynth library doesn’t
+    /// This could return `NULL` if the `VapourSynth` library doesn’t
     /// provide the requested version.
     pub getVSAPI: unsafe extern "system" fn(version: c_int) -> *const VSAPI,
 
@@ -67,8 +67,8 @@ pub struct VSSCRIPTAPI {
     /// Returns `NULL` on error.
     pub createScript: unsafe extern "system" fn(core: *mut VSCore) -> *mut VSScript,
 
-    /// Retrieves the VapourSynth core that was created in the script environment.
-    /// If a VapourSynth core has not been created yet, it will be created now,
+    /// Retrieves the `VapourSynth` core that was created in the script environment.
+    /// If a `VapourSynth` core has not been created yet, it will be created now,
     /// with the default options (see the [Python Reference][1]).
     ///
     /// [1]: http://www.vapoursynth.com/doc/pythonreference.html
@@ -122,7 +122,7 @@ pub struct VSSCRIPTAPI {
     ///
     /// It is okay to pass `NULL`.
     ///
-    /// VSScript retains ownership of the pointer and it is only guaranteed
+    /// `VSScript` retains ownership of the pointer and it is only guaranteed
     /// to be valid until the next vsscript operation on the handle.
     pub getError: unsafe extern "system" fn(handle: *mut VSScript) -> *const c_char,
 
@@ -134,7 +134,7 @@ pub struct VSSCRIPTAPI {
 
     /// Retrieves a variable from the script environment.
     ///
-    /// If a VapourSynth core has not been created yet in the script environment,
+    /// If a `VapourSynth` core has not been created yet in the script environment,
     /// one will be created now, with the default options (see the [Python Reference][1]).
     ///
     /// [1]: http://www.vapoursynth.com/doc/pythonreference.html
@@ -156,7 +156,7 @@ pub struct VSSCRIPTAPI {
     ///
     /// The variables are now available to the script.
     ///
-    /// If a VapourSynth core has not been created yet in the script environment,
+    /// If a `VapourSynth` core has not been created yet in the script environment,
     /// one will be created now, with the default options (see the [Python Reference][1]).
     ///
     /// [1]: http://www.vapoursynth.com/doc/pythonreference.html
@@ -202,10 +202,10 @@ pub struct VSSCRIPTAPI {
     /// * Cancels any clips set for output in the script environment.
     /// * Clears any variables set in the script environment.
     /// * Clears the error message from the script environment, if there is one.
-    /// * Frees the VapourSynth core used in the script environment, if there is one.
-    /// * Since this function frees the VapourSynth core, it must be called only after
-    /// all frame requests are finished and all objects obtained from the script
-    /// have been freed (frames, nodes, etc).
+    /// * Frees the `VapourSynth` core used in the script environment, if there is one.
+    /// * Since this function frees the `VapourSynth` core, it must be called only after
+    ///   all frame requests are finished and all objects obtained from the script
+    ///   have been freed (frames, nodes, etc).
     ///
     /// It is safe to pass `NULL`.
     pub freeScript: unsafe extern "system" fn(handle: *mut VSScript) -> c_int,
