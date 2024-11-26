@@ -6,7 +6,7 @@
 [1]: https://crates.io/crates/vapoursynth4-sys
 [2]: https://docs.rs/vapoursynth4-sys
 
-Raw bindings to [VapourSynth][3]. Special thanks to [Ivan Molodetskikh][4] for 
+Raw bindings to [VapourSynth][3]. Special thanks to [Ivan Molodetskikh][4] for
 their work on the original bindings.
 
 [3]: https://github.com/vapoursynth/vapoursynth
@@ -17,7 +17,7 @@ Check out [vapoursynth4-rs](https://crates.io/crates/vapoursynth4-rs) for a safe
 ## Supported Versions
 
 All VapourSynth and VSScript API versions starting with 4.0 are supported.
-By default, the crates use the latest API version available.  To use a specific version, 
+By default, the crates use the latest API version available.  To use a specific version,
 disable the default feature and enable the corresponding Cargo feature:
 
 - `vapoursynth-api-40` for VapourSynth API 4.0 (R55)
@@ -36,4 +36,4 @@ or `<...>\lib32`, depending on the target bit count.
 
 ## License
 
-Licensed under [MPL-2.0](LICENSE) or at http://mozilla.org/MPL/2.0/.
+Licensed under [MPL-2.0](LICENSE) or at <http://mozilla.org/MPL/2.0/>.
