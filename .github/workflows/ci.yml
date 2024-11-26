@@ -25,6 +25,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Dependency
+        run: cargo fetch
       - uses: actions/cache@v4
         id: cache
         with:
@@ -39,17 +43,12 @@ jobs:
         with:
           repository: vapoursynth/vapoursynth
           path: vapoursynth
-          ref: R66
+          ref: R70
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       - name: Build VapourSynth in debug mode
         run: bash scripts/build-vs.sh
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
-      - name: Dependency
-        run: cargo fetch
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       - name: Tests
         run: cargo nextest run --all-features --workspace
         env:
@@ -62,7 +61,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: microsoft/setup-msbuild@v2
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Dependency
+        run: cargo fetch
       - uses: actions/cache@v4
         id: cache
         with:
@@ -77,7 +79,7 @@ jobs:
         with:
           repository: vapoursynth/vapoursynth
           path: vapoursynth
-          ref: R66
+          ref: R70
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       - name: Fetch zimg
         uses: actions/checkout@v4
@@ -90,15 +92,14 @@ jobs:
         run: |
           python -m pip install -U pip
           pip install -U cython 
+        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      - uses: microsoft/setup-msbuild@v2
+        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       - name: Build VapourSynth in debug mode
         run: pwsh -Command ./scripts/build-vs.ps1
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
-      - name: Dependency
-        run: cargo fetch
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       - name: Tests
         run: |
           $env:VAPOURSYNTH_LIB_PATH="$PWD/vapoursynth/msvc_project/x64/Debug/"
@@ -115,10 +116,8 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: llvm-tools
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
+      - name: Dependency
+        run: cargo fetch
       - uses: actions/cache@v4
         id: cache
         with:
@@ -137,9 +136,11 @@ jobs:
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       - name: Build VapourSynth in debug mode
         run: bash scripts/build-vs.sh
-      - name: Dependency
-        run: cargo fetch
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
       - name: Generate code coverage
         run: 
           cargo +nightly llvm-cov nextest
@@ -165,8 +166,8 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
+      - name: Dependency
+        run: cargo fetch
       - uses: actions/cache@v4
         id: cache
         with:
@@ -185,9 +186,9 @@ jobs:
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       - name: Build VapourSynth in debug mode
         run: bash scripts/build-vs.sh
-      - name: Dependency
-        run: cargo fetch
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
       - name: Address Sanitizer
         run: 
           cargo +nightly nextest run
@@ -207,6 +208,8 @@ jobs:
           submodules: recursive
       - name: Install Rust
         run: rustup update stable
+      - name: Dependency
+        run: cargo fetch
       - uses: actions/cache@v4
         id: cache
         with:
@@ -215,9 +218,6 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
           key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
-      - name: Dependency
-        run: cargo fetch
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       - name: Run Clippy with reviewdog
         uses: giraffate/clippy-action@v1.0.1
         with:
