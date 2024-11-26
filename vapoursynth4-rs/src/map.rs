@@ -50,19 +50,19 @@ impl MapRef {
     #[inline]
     pub(crate) unsafe fn from_ptr_mut<'a>(ptr: *mut ffi::VSMap) -> &'a mut Self {
         debug_assert!(!ptr.is_null());
-        &mut *(ptr as *mut _)
+        &mut *ptr.cast()
     }
 
     /// Returns a raw pointer to the wrapped value.
     #[inline]
     pub(crate) fn as_ptr(&self) -> *mut ffi::VSMap {
-        self as *const _ as *mut _
+        std::ptr::from_ref(self) as *mut _
     }
 
     /// Returns a raw pointer to the wrapped value.
     #[inline]
     pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::VSMap {
-        self as *mut _ as *mut _
+        std::ptr::from_mut(self).cast()
     }
 
     pub fn clear(&mut self) {
@@ -700,7 +700,7 @@ mod tests {
         unsafe { API.set_default()? };
 
         let mut map = Map::default();
-        let key = crate::key!("what");
+        let key = crate::key!(c"what");
         map.set(key, Value::Int(42), AppendMode::Replace)?;
 
         map.clear();
@@ -715,7 +715,7 @@ mod tests {
         unsafe { API.set_default()? };
 
         let mut map = Map::default();
-        let key = crate::key!("what");
+        let key = crate::key!(c"what");
         map.set(key, Value::Float(42.0), AppendMode::Replace)?;
 
         map.set_error(cstr!("Yes"));
@@ -747,7 +747,7 @@ mod tests {
         unsafe { API.set_default()? };
 
         let mut map = Map::default();
-        let key = crate::key!("what");
+        let key = crate::key!(c"what");
 
         map.set(key, Value::Data(&[42, 43, 44, 45]), AppendMode::Replace)?;
         assert_eq!(1, map.len(), "Number of keys is not correct");
@@ -762,7 +762,7 @@ mod tests {
         unsafe { API.set_default()? };
 
         let mut map = Map::default();
-        let key = crate::key!("what");
+        let key = crate::key!(c"what");
 
         map.set(key, Value::Float(42.0), AppendMode::Append)?;
 
@@ -789,7 +789,7 @@ mod tests {
         unsafe { API.set_default()? };
 
         let mut map = Map::default();
-        let key = crate::key!("what");
+        let key = crate::key!(c"what");
 
         let source = i64::from(i32::MAX) + 1;
         map.set(key, Value::Int(source), AppendMode::Replace)?;

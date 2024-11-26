@@ -131,9 +131,9 @@ macro_rules! declare_plugin {
             vspapi: *const $crate::ffi::VSPLUGINAPI,
         ) {
             ((*vspapi).configPlugin)(
-                cstr!($id).as_ptr(),
-                cstr!($name).as_ptr(),
-                cstr!($desc).as_ptr(),
+                $id.as_ptr(),
+                $name.as_ptr(),
+                $desc.as_ptr(),
                 $crate::utils::make_version($version.0, $version.1),
                 $crate::VAPOURSYNTH_API_VERSION,
                 $flags,
