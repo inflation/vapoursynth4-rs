@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::{
-    api::{api, error::ApiNotSet, Api, API},
+    api::{api, Api},
     ffi,
     frame::{AudioFormat, AudioFrame, Frame, VideoFormat, VideoFrame},
     function::Function,
@@ -30,7 +30,7 @@ pub struct CoreRef<'c> {
     marker: PhantomData<&'c Core>,
 }
 
-impl<'c> CoreRef<'c> {
+impl CoreRef<'_> {
     #[must_use]
     pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSCore) -> Self {
         Self {
@@ -61,9 +61,8 @@ pub struct Core {
 }
 
 impl Core {
-    unsafe fn new_with(flags: i32, vsapi: *const ffi::VSAPI) -> Self {
-        API.set(vsapi);
-        let core = unsafe { ((*vsapi).createCore)(flags) };
+    unsafe fn new_with(flags: i32, vsapi: &Api) -> Self {
+        let core = unsafe { (vsapi.createCore)(flags) };
         Self {
             handle: NonNull::new_unchecked(core),
         }
@@ -386,15 +385,11 @@ impl<'api> CoreBuilder<'api> {
         Self::default()
     }
 
-    /// # Errors
+    /// # Panics
     ///
     /// Return [`ApiNotSet`] if the API is not set.
-    pub fn build(&mut self) -> Result<Core, ApiNotSet> {
-        let Some(api) = self.api else {
-            return Err(ApiNotSet {});
-        };
-
-        let mut core = unsafe { Core::new_with(self.flags, api.into()) };
+    pub fn build(&mut self) -> Core {
+        let mut core = unsafe { Core::new_with(self.flags, self.api.unwrap()) };
         if let Some(size) = self.max_cache_size {
             core.set_max_cache_size(size);
         }
@@ -402,7 +397,7 @@ impl<'api> CoreBuilder<'api> {
             core.set_thread_count(count);
         }
 
-        Ok(core)
+        core
     }
 
     pub fn api(&mut self, api: &'api Api) -> &mut Self {
@@ -439,27 +434,20 @@ impl<'api> CoreBuilder<'api> {
 #[cfg(test)]
 #[cfg(feature = "link-library")]
 mod tests {
-    use std::ptr::addr_of;
-    use testresult::TestResult;
-
     use super::*;
 
     #[test]
-    fn builder() -> TestResult {
-        unsafe { API.set_default() }?;
-        let core = unsafe {
-            CoreBuilder::new()
-                .api(&*addr_of!(API))
-                .enable_graph_inspection()
-                .disable_auto_loading()
-                .disable_library_unloading()
-                .max_cache_size(1024)
-                .thread_count(4)
-                .build()?
-        };
+    fn builder() {
+        Api::set_default();
+        let core = CoreBuilder::new()
+            .api(api())
+            .enable_graph_inspection()
+            .disable_auto_loading()
+            .disable_library_unloading()
+            .max_cache_size(1024)
+            .thread_count(4)
+            .build();
         assert_eq!(core.get_info().max_framebuffer_size, 1024);
         assert_eq!(core.get_info().num_threads, 4);
-
-        Ok(())
     }
 }
