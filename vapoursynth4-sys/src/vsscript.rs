@@ -35,7 +35,7 @@ use std::ffi::*;
 use super::*;
 
 pub const VSSCRIPT_API_MAJOR: u16 = 4;
-pub const VSSCRIPT_API_MINOR: u16 = if cfg!(feature = "vsscript-41") { 1 } else { 0 };
+pub const VSSCRIPT_API_MINOR: u16 = if cfg!(feature = "vsscript-42") { 2 } else { 1 };
 pub const VSSCRIPT_API_VERSION: i32 = vs_make_version(VSSCRIPT_API_MAJOR, VSSCRIPT_API_MINOR);
 
 opaque_struct!(
@@ -210,11 +210,16 @@ pub struct VSSCRIPTAPI {
     /// It is safe to pass `NULL`.
     pub freeScript: unsafe extern "system" fn(handle: *mut VSScript) -> c_int,
 
-    #[cfg(feature = "vsscript-41")]
     /// Set whether or not the working directory is temporarily changed to the same location
     /// as the script file when [`evaluateFile()`](Self::evaluateFile) is called. Off by default.
     pub evalSetWorkingDir:
         unsafe extern "system" fn(handle: *mut VSScript, setCWD: c_int) -> c_void,
+
+    /// Write a list of set output index values to dst but at most size values.
+    /// Always returns the total number of available output index values.
+    #[cfg(feature = "vsscript-42")]
+    pub getAvailableOutputNodes:
+        unsafe extern "system" fn(handle: *mut VSScript, size: c_int, dst: *mut c_int) -> c_int,
 }
 
 extern "system" {
