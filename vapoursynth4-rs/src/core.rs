@@ -12,8 +12,11 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
+use bon::{bon, builder};
+use core_builder::State;
+
 use crate::{
-    api::{api, Api},
+    api::{api, set_api, Api},
     ffi,
     frame::{AudioFormat, AudioFrame, Frame, VideoFormat, VideoFrame},
     function::Function,
@@ -371,62 +374,47 @@ impl Drop for Core {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct CoreBuilder<'api> {
-    flags: i32,
-    max_cache_size: Option<i64>,
-    thread_count: Option<i32>,
-    api: Option<&'api Api>,
-}
+// MARK: Builder
 
-impl<'api> CoreBuilder<'api> {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
+#[bon]
+impl Core {
 
-    /// # Panics
-    ///
-    /// Return [`ApiNotSet`] if the API is not set.
-    pub fn build(&mut self) -> Core {
-        let mut core = unsafe { Core::new_with(self.flags, self.api.unwrap()) };
-        if let Some(size) = self.max_cache_size {
+    #[builder]
+    pub fn new(
+        #[builder(field)] flags: i32,
+        max_cache_size: Option<i64>,
+        thread_count: Option<i32>,
+        #[cfg(feature = "link-library")]
+        #[builder(default)] api: Api,
+        #[cfg(not(feature = "link-library"))]
+        api: Api,
+    ) -> Self {
+        let mut core = unsafe { Core::new_with(flags, &api) };
+        set_api(api.handle.load(std::sync::atomic::Ordering::Acquire));
+        if let Some(size) = max_cache_size {
             core.set_max_cache_size(size);
         }
-        if let Some(count) = self.thread_count {
+        if let Some(count) = thread_count {
             core.set_thread_count(count);
         }
 
         core
     }
+}
 
-    pub fn api(&mut self, api: &'api Api) -> &mut Self {
-        self.api = Some(api);
-        self
-    }
-
-    pub fn enable_graph_inspection(&mut self) -> &mut Self {
+impl<S: State> CoreBuilder<S> {
+    pub fn enable_graph_inspection(mut self) -> Self {
         self.flags |= ffi::VSCoreCreationFlags::EnableGraphInspection as i32;
         self
     }
 
-    pub fn disable_auto_loading(&mut self) -> &mut Self {
+    pub fn disable_auto_loading(mut self) -> Self {
         self.flags |= ffi::VSCoreCreationFlags::DisableAutoLoading as i32;
         self
     }
 
-    pub fn disable_library_unloading(&mut self) -> &mut Self {
+    pub fn disable_library_unloading(mut self) -> Self {
         self.flags |= ffi::VSCoreCreationFlags::DisableLibraryUnloading as i32;
-        self
-    }
-
-    pub fn max_cache_size(&mut self, size: i64) -> &mut Self {
-        self.max_cache_size = Some(size);
-        self
-    }
-
-    pub fn thread_count(&mut self, count: i32) -> &mut Self {
-        self.thread_count = Some(count);
         self
     }
 }
@@ -438,9 +426,9 @@ mod tests {
 
     #[test]
     fn builder() {
-        Api::set_default();
-        let core = CoreBuilder::new()
-            .api(api())
+        let api = Api::default();
+        let core = Core::builder()
+            .api(api)
             .enable_graph_inspection()
             .disable_auto_loading()
             .disable_library_unloading()
