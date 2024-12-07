@@ -37,7 +37,7 @@ pub(crate) fn api() -> &'static Api {
 
 #[derive(Debug)]
 pub struct Api {
-    handle: AtomicPtr<ffi::VSAPI>,
+    pub(crate) handle: AtomicPtr<ffi::VSAPI>,
 }
 
 impl Api {
@@ -58,16 +58,6 @@ impl Api {
         }
     }
 
-    /// Creates a new `Api` instance with the default version.
-    ///
-    /// # Panics
-    ///
-    /// Internal error indicates that something went wrong with the linked `VapourSynth` library.
-    #[cfg(feature = "link-library")]
-    #[must_use]
-    pub fn new_default() -> Self {
-        Self::new(ffi::VAPOURSYNTH_API_MAJOR, ffi::VAPOURSYNTH_API_MINOR).unwrap()
-    }
 
     pub(crate) fn set(&self, ptr: *const ffi::VSAPI) {
         assert!(
@@ -86,7 +76,7 @@ impl Api {
     #[cfg(test)]
     #[cfg(feature = "link-library")]
     pub(crate) fn set_default() {
-        let api = Self::new_default();
+        let api = Self::default();
         unsafe { *(&raw const API).cast_mut() = api };
     }
 }
@@ -96,6 +86,19 @@ impl Deref for Api {
 
     fn deref(&self) -> &Self::Target {
         unsafe { &*self.handle.load(Ordering::Acquire) }
+    }
+}
+
+#[cfg(feature = "link-library")]
+impl Default for Api {
+    /// Creates a new `Api` instance with the default version.
+    ///
+    /// # Panics
+    ///
+    /// Internal error indicates that something went wrong with the linked `VapourSynth` library.
+    #[must_use]
+    fn default() -> Self {
+        Self::new(ffi::VAPOURSYNTH_API_MAJOR, ffi::VAPOURSYNTH_API_MINOR).unwrap()
     }
 }
 
