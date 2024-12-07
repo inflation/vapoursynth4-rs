@@ -16,8 +16,10 @@ cc = { version = "1.0.83", optional = true }
 
 [features]
 # Features for enabling higher API versions.
+vs-41 = []
+
 vsscript = []
-vsscript-41 = []
+vsscript-42 = []
 
 # Experimental features.
 vs-graph = []
@@ -25,7 +27,7 @@ vs-graph = []
 # Link the VapourSynth library
 link-library = []
 
-default = ["vsscript", "vsscript-41", "vs-graph"]
+default = ["vs-41", "vsscript", "vsscript-42", "vs-graph"]
 
 [package.metadata.docs.rs]
 all-features = true
