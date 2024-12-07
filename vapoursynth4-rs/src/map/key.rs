@@ -1,7 +1,8 @@
 use std::{
     ffi::{c_char, CStr, CString},
     fmt::{Debug, Display},
-    ops::Deref, ptr,
+    ops::Deref,
+    ptr,
 };
 
 use thiserror::Error;
@@ -41,7 +42,7 @@ impl Deref for Key {
 
     fn deref(&self) -> &Self::Target {
         // SAFETY: Key is validated
-        unsafe { KeyStr::from_cstr_unchecked(self.inner.as_c_str()) } 
+        unsafe { KeyStr::from_cstr_unchecked(self.inner.as_c_str()) }
     }
 }
 
@@ -73,7 +74,10 @@ impl KeyStr {
         let slice = str.to_bytes();
         while i < slice.len() {
             let c = slice[i];
-            assert!(c.is_ascii_alphanumeric() || c == b'_', "Key must be alphanumeric or underscore");
+            assert!(
+                c.is_ascii_alphanumeric() || c == b'_',
+                "Key must be alphanumeric or underscore"
+            );
             i += 1;
         }
         unsafe { Self::from_cstr_unchecked(str) }
