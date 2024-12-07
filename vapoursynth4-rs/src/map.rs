@@ -123,9 +123,9 @@ impl MapRef {
         }
     }
 
-    unsafe fn _get<T>(
+    unsafe fn get_internal<T>(
         &self,
-        func: unsafe extern "system" fn(
+        func: unsafe extern "system-unwind" fn(
             *const ffi::VSMap,
             *const c_char,
             c_int,
@@ -142,14 +142,14 @@ impl MapRef {
     ///
     /// Return [`MapPropertyError`] if the underlying API does not success
     pub fn get_int(&self, key: &KeyStr, index: i32) -> Result<i64, MapPropertyError> {
-        unsafe { self._get(api().mapGetInt, key, index) }
+        unsafe { self.get_internal(api().mapGetInt, key, index) }
     }
 
     /// # Errors
     ///
     /// Return [`MapPropertyError`] if the underlying API does not success
     pub fn get_float(&self, key: &KeyStr, index: i32) -> Result<f64, MapPropertyError> {
-        unsafe { self._get(api().mapGetFloat, key, index) }
+        unsafe { self.get_internal(api().mapGetFloat, key, index) }
     }
 
     /// # Errors
@@ -160,9 +160,11 @@ impl MapRef {
         use ffi::VSDataTypeHint as dt;
 
         unsafe {
-            if let dt::Unknown | dt::Binary = self._get(api().mapGetDataTypeHint, key, index)? {
-                let size = self._get(api().mapGetDataSize, key, index)?;
-                let ptr = self._get(api().mapGetData, key, index)?;
+            if let dt::Unknown | dt::Binary =
+                self.get_internal(api().mapGetDataTypeHint, key, index)?
+            {
+                let size = self.get_internal(api().mapGetDataSize, key, index)?;
+                let ptr = self.get_internal(api().mapGetData, key, index)?;
 
                 Ok(std::slice::from_raw_parts(ptr.cast(), size as _))
             } else {
@@ -177,9 +179,11 @@ impl MapRef {
     #[allow(clippy::cast_sign_loss)]
     pub fn get_utf8(&self, key: &KeyStr, index: i32) -> Result<&str, MapPropertyError> {
         unsafe {
-            if let ffi::VSDataTypeHint::Utf8 = self._get(api().mapGetDataTypeHint, key, index)? {
-                let size = self._get(api().mapGetDataSize, key, index)?;
-                let ptr = self._get(api().mapGetData, key, index)?;
+            if let ffi::VSDataTypeHint::Utf8 =
+                self.get_internal(api().mapGetDataTypeHint, key, index)?
+            {
+                let size = self.get_internal(api().mapGetDataSize, key, index)?;
+                let ptr = self.get_internal(api().mapGetData, key, index)?;
 
                 Ok(std::str::from_utf8_unchecked(std::slice::from_raw_parts(
                     ptr.cast(),
@@ -196,7 +200,7 @@ impl MapRef {
     /// Return [`MapPropertyError`] if the underlying API does not success
     pub fn get_function(&self, key: &KeyStr, index: i32) -> Result<Function, MapPropertyError> {
         unsafe {
-            self._get(api().mapGetFunction, key, index)
+            self.get_internal(api().mapGetFunction, key, index)
                 .map(|p| Function::from_ptr(p))
         }
     }
@@ -206,7 +210,7 @@ impl MapRef {
     /// Return [`MapPropertyError`] if the underlying API does not success
     pub fn get_video_node(&self, key: &KeyStr, index: i32) -> Result<VideoNode, MapPropertyError> {
         unsafe {
-            self._get(api().mapGetNode, key, index)
+            self.get_internal(api().mapGetNode, key, index)
                 .map(|p| VideoNode::from_ptr(p))
         }
     }
@@ -216,7 +220,7 @@ impl MapRef {
     /// Return [`MapPropertyError`] if the underlying API does not success
     pub fn get_audio_node(&self, key: &KeyStr, index: i32) -> Result<AudioNode, MapPropertyError> {
         unsafe {
-            self._get(api().mapGetNode, key, index)
+            self.get_internal(api().mapGetNode, key, index)
                 .map(|p| AudioNode::from_ptr(p))
         }
     }
@@ -230,7 +234,7 @@ impl MapRef {
         index: i32,
     ) -> Result<VideoFrame, MapPropertyError> {
         unsafe {
-            self._get(api().mapGetFrame, key, index)
+            self.get_internal(api().mapGetFrame, key, index)
                 .map(|p| VideoFrame::from_ptr(p))
         }
     }
@@ -244,7 +248,7 @@ impl MapRef {
         index: i32,
     ) -> Result<AudioFrame, MapPropertyError> {
         unsafe {
-            self._get(api().mapGetFrame, key, index)
+            self.get_internal(api().mapGetFrame, key, index)
                 .map(|p| AudioFrame::from_ptr(p))
         }
     }
@@ -263,18 +267,18 @@ impl MapRef {
                 t::Data => {
                     use ffi::VSDataTypeHint as dt;
 
-                    let size = self._get(api().mapGetDataSize, key, index)?;
+                    let size = self.get_internal(api().mapGetDataSize, key, index)?;
                     #[allow(clippy::cast_sign_loss)]
-                    match self._get(api().mapGetDataTypeHint, key, index)? {
+                    match self.get_internal(api().mapGetDataTypeHint, key, index)? {
                         dt::Unknown | dt::Binary => {
-                            let ptr = self._get(api().mapGetData, key, index)?;
+                            let ptr = self.get_internal(api().mapGetData, key, index)?;
                             Ok(Value::Data(std::slice::from_raw_parts(
                                 ptr.cast(),
                                 size as _,
                             )))
                         }
                         dt::Utf8 => {
-                            let ptr = self._get(api().mapGetData, key, index)?;
+                            let ptr = self.get_internal(api().mapGetData, key, index)?;
                             Ok(Value::Utf8(std::str::from_utf8_unchecked(
                                 std::slice::from_raw_parts(ptr.cast(), size as _),
                             )))
@@ -294,7 +298,7 @@ impl MapRef {
     ///
     /// Return [`MapPropertyError`] if the underlying API does not success
     pub fn get_int_saturated(&self, key: &KeyStr, index: i32) -> Result<i32, MapPropertyError> {
-        unsafe { self._get(api().mapGetIntSaturated, key, index) }
+        unsafe { self.get_internal(api().mapGetIntSaturated, key, index) }
     }
 
     /// # Errors
@@ -321,7 +325,7 @@ impl MapRef {
     /// Return [`MapPropertyError`] if the underlying API does not success
     pub fn get_float_saturated(&self, key: &KeyStr, index: i32) -> Result<f32, MapPropertyError> {
         // safety: `self.handle` is a valid pointer
-        unsafe { self._get(api().mapGetFloatSaturated, key, index) }
+        unsafe { self.get_internal(api().mapGetFloatSaturated, key, index) }
     }
 
     /// # Errors
@@ -352,9 +356,9 @@ impl MapRef {
         assert!(res != 0);
     }
 
-    unsafe fn _set<T>(
+    unsafe fn set_internal<T>(
         &mut self,
-        func: unsafe extern "system" fn(
+        func: unsafe extern "system-unwind" fn(
             *mut ffi::VSMap,
             *const c_char,
             T,
@@ -382,8 +386,8 @@ impl MapRef {
     ) -> Result<(), MapPropertyError> {
         unsafe {
             match val {
-                Value::Int(val) => self._set(api().mapSetInt, key, val, append),
-                Value::Float(val) => self._set(api().mapSetFloat, key, val, append),
+                Value::Int(val) => self.set_internal(api().mapSetInt, key, val, append),
+                Value::Float(val) => self.set_internal(api().mapSetFloat, key, val, append),
                 Value::Data(val) => handle_set_error((api().mapSetData)(
                     self.as_mut_ptr(),
                     key.as_ptr(),
@@ -401,14 +405,20 @@ impl MapRef {
                     append,
                 )),
                 Value::VideoNode(val) => {
-                    self._set(api().mapSetNode, key, val.as_ptr().cast_mut(), append)
+                    self.set_internal(api().mapSetNode, key, val.as_ptr().cast_mut(), append)
                 }
                 Value::AudioNode(val) => {
-                    self._set(api().mapSetNode, key, val.as_ptr().cast_mut(), append)
+                    self.set_internal(api().mapSetNode, key, val.as_ptr().cast_mut(), append)
                 }
-                Value::VideoFrame(val) => self._set(api().mapSetFrame, key, val.as_ptr(), append),
-                Value::AudioFrame(val) => self._set(api().mapSetFrame, key, val.as_ptr(), append),
-                Value::Function(val) => self._set(api().mapSetFunction, key, val.as_ptr(), append),
+                Value::VideoFrame(val) => {
+                    self.set_internal(api().mapSetFrame, key, val.as_ptr(), append)
+                }
+                Value::AudioFrame(val) => {
+                    self.set_internal(api().mapSetFrame, key, val.as_ptr(), append)
+                }
+                Value::Function(val) => {
+                    self.set_internal(api().mapSetFunction, key, val.as_ptr(), append)
+                }
             }
         }
     }
@@ -671,13 +681,13 @@ mod tests {
     use const_str::cstr;
     use testresult::TestResult;
 
-    use crate::api::API;
+    use crate::api::Api;
 
     use super::*;
 
     #[test]
-    fn refs_and_derefs() -> TestResult {
-        unsafe { API.set_default()? };
+    fn refs_and_derefs() {
+        Api::set_default();
 
         let mut map = Map::default();
         let ptr = map.as_mut_ptr();
@@ -691,13 +701,12 @@ mod tests {
             assert_eq!(MapRef::from_ptr(ptr).as_ptr(), ptr);
             assert_eq!(MapRef::from_ptr_mut(ptr).as_ptr(), ptr);
         }
-
-        Ok(())
     }
 
     #[test]
     fn clear() -> TestResult {
-        unsafe { API.set_default()? };
+        Api::set_default();
+        Api::set_default();
 
         let mut map = Map::default();
         let key = crate::key!(c"what");
@@ -712,7 +721,8 @@ mod tests {
 
     #[test]
     fn error() -> TestResult {
-        unsafe { API.set_default()? };
+        Api::set_default();
+        Api::set_default();
 
         let mut map = Map::default();
         let key = crate::key!(c"what");
@@ -744,7 +754,8 @@ mod tests {
 
     #[test]
     fn len() -> TestResult {
-        unsafe { API.set_default()? };
+        Api::set_default();
+        Api::set_default();
 
         let mut map = Map::default();
         let key = crate::key!(c"what");
@@ -759,7 +770,8 @@ mod tests {
 
     #[test]
     fn key() -> TestResult {
-        unsafe { API.set_default()? };
+        Api::set_default();
+        Api::set_default();
 
         let mut map = Map::default();
         let key = crate::key!(c"what");
@@ -786,7 +798,8 @@ mod tests {
     #[test]
     #[allow(clippy::float_cmp)]
     fn get_set() -> TestResult {
-        unsafe { API.set_default()? };
+        Api::set_default();
+        Api::set_default();
 
         let mut map = Map::default();
         let key = crate::key!(c"what");
