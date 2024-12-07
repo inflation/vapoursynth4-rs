@@ -22,7 +22,7 @@ use super::*;
 pub const VAPOURSYNTH_API_MAJOR: u16 = 4;
 /// Minor API version. It is bumped when new functions are added to [`VSAPI`]
 /// or core behavior is noticeably changed.
-pub const VAPOURSYNTH_API_MINOR: u16 = 0;
+pub const VAPOURSYNTH_API_MINOR: u16 = if cfg!(feature = "vs-41") { 1 } else { 0 };
 /// API version. The high 16 bits are [`VAPOURSYNTH_API_MAJOR`], the low 16 bits are
 /// [`VAPOURSYNTH_API_MINOR`].
 pub const VAPOURSYNTH_API_VERSION: i32 =
@@ -203,6 +203,10 @@ pub enum VSPresetVideoFormat {
     YUV422P16 = vs_make_video_id(YUV, Integer, 16, 1, 0),
     YUV444P16 = vs_make_video_id(YUV, Integer, 16, 0, 0),
 
+    YUV420PH = vs_make_video_id(YUV, Float, 16, 1, 1),
+    YUV420PS = vs_make_video_id(YUV, Float, 32, 1, 1),
+    YUV422PH = vs_make_video_id(YUV, Float, 16, 1, 0),
+    YUV422PS = vs_make_video_id(YUV, Float, 32, 1, 0),
     YUV444PH = vs_make_video_id(YUV, Float, 16, 0, 0),
     YUV444PS = vs_make_video_id(YUV, Float, 32, 0, 0),
 
@@ -761,7 +765,8 @@ pub struct VSFilterDependency {
     pub request_pattern: VSRequestPattern,
 }
 
-// SECTION - VSAPI
+// MARK: VSAPI
+
 /// This giant struct is the way to access `VapourSynth`'s public API.
 #[allow(non_snake_case)]
 #[repr(C)]
@@ -2108,42 +2113,63 @@ pub struct VSAPI {
     /// * `handle` - Handle obtained from [`addLogHandler()`](Self::addLogHandler).
     pub removeLogHandler:
         unsafe extern "system" fn(handle: *mut VSLogHandle, core: *mut VSCore) -> c_int,
+
     // !SECTION
 
-    // SECTION - Graph information
+    // MARK: API 4.1
+    // mostly graph and node inspection, PLEASE DON'T USE INSIDE FILTERS
+
+    /* Additional cache management to free memory */
+    /// clears the cache of the specified node
+    #[cfg(feature = "vs-41")]
+    pub clearNodeCache: unsafe extern "system" fn(node: *mut VSNode),
+    /// clears all caches belonging to the specified core
+    #[cfg(feature = "vs-41")]
+    pub clearCoreCaches: unsafe extern "system" fn(core: *mut VSCore),
+
+    /* Basic node information */
+    /// the name passed to `create*Filter*`
+    #[cfg(feature = "vs-41")]
+    pub getNodeName: unsafe extern "system" fn(node: *mut VSNode) -> *const c_char,
+    #[cfg(feature = "vs-41")]
+    /// returns [`VSFilterMode`]
+    pub getNodeFilterMode: unsafe extern "system" fn(node: *mut VSNode) -> VSFilterMode,
+    #[cfg(feature = "vs-41")]
+    pub getNumNodeDependencies: unsafe extern "system" fn(node: *mut VSNode) -> c_int,
+    #[cfg(feature = "vs-41")]
+    pub getNodeDependencies:
+        unsafe extern "system" fn(node: *mut VSNode) -> *const VSFilterDependency,
+
+    /* Node timing functions */
+    /// non-zero when filter timing is enabled
+    pub getCoreNodeTiming: unsafe extern "system" fn(core: *mut VSCore) -> c_int,
+    /// non-zero enables filter timing, note that disabling simply stops the counters from incrementing
+    pub setCoreNodeTiming: unsafe extern "system" fn(core: *mut VSCore, enable: c_int),
+    /// time spent processing frames in nanoseconds, reset sets the counter to 0 again
+    pub getNodeProcessingTime: unsafe extern "system" fn(node: *mut VSNode, reset: c_int) -> i64,
+    /// time spent processing frames in nanoseconds in all destroyed nodes, reset sets the counter to 0 again
+    pub getFreedNodeProcessingTime: unsafe extern "system" fn(core: *mut VSCore, reset: c_int) -> i64,
+
+    // MARK: Graph information
     /*
+     * !!! Experimental/expensive graph information
      * These functions only exist to retrieve internal details for debug purposes and
      * graph visualization They will only only work properly when used on a core created
-     * with ccfEnableGraphInspection and are not safe to use concurrently with frame requests
+     * with `ccfEnableGraphInspection` and are not safe to use concurrently with frame requests
      * or other API functions. Because of this they are unsuitable for use in plugins and filters.
      */
-    #[cfg(feature = "vs-graph")]
     /// level=0 returns the name of the function that created the filter,
     /// specifying a higher level will retrieve the function above that
     /// invoked it or `NULL` if a non-existent level is requested
+    #[cfg(feature = "vs-graph")]
     pub getNodeCreationFunctionName:
         unsafe extern "system" fn(node: *mut VSNode, level: c_int) -> *const c_char,
-    #[cfg(feature = "vs-graph")]
     /// level=0 returns a copy of the arguments passed to the function that created the filter,
     /// returns `NULL` if a non-existent level is requested
+    #[cfg(feature = "vs-graph")]
     pub getNodeCreationFunctionArguments:
         unsafe extern "system" fn(node: *mut VSNode, level: c_int) -> *const VSMap,
-    #[cfg(feature = "vs-graph")]
-    /// the name passed to `create*Filter*`
-    pub getNodeName: unsafe extern "system" fn(node: *mut VSNode) -> *const c_char,
-    #[cfg(feature = "vs-graph")]
-    pub getNodeFilterMode: unsafe extern "system" fn(node: *mut VSNode) -> VSFilterMode,
-    #[cfg(feature = "vs-graph")]
-    /// time spent processing frames in nanoseconds
-    pub getNodeFilterTime: unsafe extern "system" fn(node: *mut VSNode) -> i64,
-    #[cfg(feature = "vs-graph")]
-    pub getNodeDependencies:
-        unsafe extern "system" fn(node: *mut VSNode) -> *const VSFilterDependency,
-    #[cfg(feature = "vs-graph")]
-    pub getNumNodeDependencies: unsafe extern "system" fn(node: *mut VSNode) -> c_int,
-    // !SECTION
 }
-// !SECTION
 
 extern "system" {
     /// Returns a pointer to the global [`VSAPI`] instance.
