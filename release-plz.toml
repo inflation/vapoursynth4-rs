@@ -4,14 +4,6 @@ git_release_type = "auto"
 pr_labels = ["release"]
 
 [[package]]
-name = "vapoursynth4-rs"
-publish_features = ["vendored"]
-
-[[package]]
-name = "vapoursynth4-sys"
-publish_features = ["vendored"]
-
-[[package]]
 name = "sample-plugin"
 release = false
 
