@@ -11,6 +11,10 @@ publish_features = ["vendored"]
 name = "vapoursynth4-sys"
 publish_features = ["vendored"]
 
+[[package]]
+name = "sample-plugin"
+release = false
+
 [changelog]
 header = """# Changelog
 
