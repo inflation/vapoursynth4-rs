@@ -4,12 +4,7 @@
  file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-use core::panic;
-use std::{
-    ops::Deref,
-    ptr::null_mut,
-    sync::atomic::{AtomicPtr, Ordering},
-};
+use std::ops::Deref;
 
 #[cfg(feature = "link-library")]
 use vapoursynth4_sys::vs_make_version;
@@ -19,26 +14,9 @@ use crate::ffi;
 #[cfg(feature = "link-library")]
 use self::error::ApiNotFound;
 
-static API: Api = Api {
-    handle: AtomicPtr::new(std::ptr::null_mut()),
-};
-
-pub(crate) fn set_api(ptr: *const ffi::VSAPI) {
-    API.set(ptr);
-}
-
-pub(crate) fn api() -> &'static Api {
-    if API.handle.load(Ordering::Acquire).is_null() {
-        panic!("API is not set");
-    } else {
-        &API
-    }
-}
-
-#[derive(Debug)]
-pub struct Api {
-    pub(crate) handle: AtomicPtr<ffi::VSAPI>,
-}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct Api(*const ffi::VSAPI);
 
 impl Api {
     /// Creates a new `Api` instance with the specified major and minor version.
@@ -52,32 +30,12 @@ impl Api {
         if ptr.is_null() {
             Err(ApiNotFound { major, minor })
         } else {
-            Ok(Self {
-                handle: AtomicPtr::new(ptr.cast_mut()),
-            })
+            Ok(Self(ptr))
         }
     }
 
-
-    pub(crate) fn set(&self, ptr: *const ffi::VSAPI) {
-        assert!(
-            self.handle
-                .compare_exchange(
-                    null_mut(),
-                    ptr.cast_mut(),
-                    Ordering::AcqRel,
-                    Ordering::Relaxed
-                )
-                .is_ok(),
-            "API is already set"
-        );
-    }
-
-    #[cfg(test)]
-    #[cfg(feature = "link-library")]
-    pub(crate) fn set_default() {
-        let api = Self::default();
-        unsafe { *(&raw const API).cast_mut() = api };
+    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSAPI) -> Self {
+        Self(ptr)
     }
 }
 
@@ -85,7 +43,7 @@ impl Deref for Api {
     type Target = ffi::VSAPI;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { &*self.handle.load(Ordering::Acquire) }
+        unsafe { &*self.0 }
     }
 }
 

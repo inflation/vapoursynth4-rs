@@ -26,8 +26,8 @@ impl Filter for DumbFilter {
     type FilterData = ();
 
     fn create(
-        input: &MapRef,
-        output: &mut MapRef,
+        input: MapRef,
+        output: MapRef,
         _data: Option<Box<Self::FilterData>>,
         mut core: CoreRef,
     ) -> Result<(), Self::Error> {
@@ -44,7 +44,7 @@ impl Filter for DumbFilter {
             return Err(c"Invert: only constant format 8bit integer input supported");
         }
 
-        let mut filter = DumbFilter {
+        let filter = DumbFilter {
             node,
             enabled: input
                 .get_int(key!(c"enabled"), 0)
@@ -53,7 +53,7 @@ impl Filter for DumbFilter {
         };
 
         let deps = [FilterDependency {
-            source: filter.node.as_mut_ptr(),
+            source: filter.node.as_ptr(),
             request_pattern: RequestPattern::StrictSpatial,
         }];
 
