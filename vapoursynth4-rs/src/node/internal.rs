@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    api::set_api,
+    api::Api,
     core::CoreRef,
     frame::{Frame, FrameContext},
     map::MapRef,
@@ -23,11 +23,11 @@ pub trait FilterExtern: Filter {
         core: *mut ffi::VSCore,
         vsapi: *const ffi::VSAPI,
     ) {
-        set_api(vsapi);
+        let api = Api::from_ptr(vsapi);
 
-        let input = MapRef::from_ptr(in_);
-        let output = MapRef::from_ptr_mut(out);
-        let core = CoreRef::from_ptr(core);
+        let input = MapRef::from_ptr(in_, api);
+        let mut output = MapRef::from_ptr(out, api);
+        let core = CoreRef::from_ptr(core, api);
         let data = if user_data.is_null() {
             None
         } else {
@@ -56,10 +56,10 @@ pub trait FilterExtern: Filter {
         core: *mut ffi::VSCore,
         vsapi: *const ffi::VSAPI,
     ) -> *const ffi::VSFrame {
-        let _ = vsapi;
+        let api = Api::from_ptr(vsapi);
         let filter = instance_data.cast::<Self>().as_mut().unwrap_unchecked();
-        let mut ctx = AssertUnwindSafe(FrameContext::from_ptr(frame_ctx));
-        let core = CoreRef::from_ptr(core);
+        let mut ctx = AssertUnwindSafe(FrameContext::from_ptr(frame_ctx, api));
+        let core = CoreRef::from_ptr(core, api);
 
         let frame = std::panic::catch_unwind(|| {
             filter.get_frame(n, activation_reason, frame_data, *ctx, core)
@@ -88,9 +88,9 @@ pub trait FilterExtern: Filter {
         core: *mut ffi::VSCore,
         vsapi: *const ffi::VSAPI,
     ) {
-        let _ = vsapi;
+        let api = Api::from_ptr(vsapi);
         let filter = Box::from_raw(instance_data.cast::<Self>());
-        let core = CoreRef::from_ptr(core);
+        let core = CoreRef::from_ptr(core, api);
 
         filter.free(core);
     }

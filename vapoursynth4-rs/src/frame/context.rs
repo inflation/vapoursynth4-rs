@@ -1,23 +1,24 @@
 use std::{ffi::CStr, ptr::NonNull};
 
 use crate::{
-    api::api,
+    api::Api,
     ffi,
     frame::Frame,
     node::{Node, VideoNode},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
 pub struct FrameContext {
     handle: NonNull<ffi::VSFrameContext>,
+    api: Api,
 }
 
 impl FrameContext {
     #[must_use]
-    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSFrameContext) -> FrameContext {
+    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSFrameContext, api: Api) -> FrameContext {
         FrameContext {
             handle: NonNull::new_unchecked(ptr.cast_mut()),
+            api,
         }
     }
 
@@ -33,25 +34,25 @@ impl FrameContext {
 
     pub fn request_frame_filter(&mut self, n: i32, node: &VideoNode) {
         unsafe {
-            (api().requestFrameFilter)(n, node.as_ptr().cast_mut(), self.as_mut_ptr());
+            (self.api.requestFrameFilter)(n, node.as_ptr(), self.as_mut_ptr());
         }
     }
 
     pub fn release_frame_early(&mut self, n: i32, node: &VideoNode) {
         unsafe {
-            (api().releaseFrameEarly)(node.as_ptr().cast_mut(), n, self.as_mut_ptr());
+            (self.api.releaseFrameEarly)(node.as_ptr(), n, self.as_mut_ptr());
         }
     }
 
     pub fn cache_frame(&mut self, frame: &impl Frame, n: i32) {
         unsafe {
-            (api().cacheFrame)(frame.as_ptr(), n, self.as_mut_ptr());
+            (self.api.cacheFrame)(frame.as_ptr(), n, self.as_mut_ptr());
         }
     }
 
     pub fn set_filter_error(&mut self, msg: &CStr) {
         unsafe {
-            (api().setFilterError)(msg.as_ptr().cast(), self.as_mut_ptr());
+            (self.api.setFilterError)(msg.as_ptr().cast(), self.as_mut_ptr());
         }
     }
 }

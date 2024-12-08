@@ -1,17 +1,18 @@
 use std::ptr::NonNull;
 
-use crate::{api::api, ffi, map::Map};
+use crate::{api::Api, ffi, map::Map};
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Function {
     handle: NonNull<ffi::VSFunction>,
+    api: Api,
 }
 
 impl Function {
-    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSFunction) -> Self {
+    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSFunction, api: Api) -> Self {
         Self {
             handle: NonNull::new_unchecked(ptr),
+            api,
         }
     }
 
@@ -22,19 +23,19 @@ impl Function {
 
     pub fn call(&mut self, in_: &Map, out: &mut Map) {
         unsafe {
-            (api().callFunction)(self.handle.as_ptr(), in_.as_ptr(), out.as_mut_ptr());
+            (self.api.callFunction)(self.handle.as_ptr(), in_.as_ptr(), out.as_ptr());
         }
     }
 }
 
 impl Drop for Function {
     fn drop(&mut self) {
-        unsafe { (api().freeFunction)(self.as_ptr()) }
+        unsafe { (self.api.freeFunction)(self.as_ptr()) }
     }
 }
 
 impl Clone for Function {
     fn clone(&self) -> Self {
-        unsafe { Self::from_ptr((api().addFunctionRef)(self.as_ptr())) }
+        unsafe { Self::from_ptr((self.api.addFunctionRef)(self.as_ptr()), self.api) }
     }
 }
