@@ -1,16 +1,16 @@
 use std::{ffi::CStr, fmt::Display};
 
-use crate::{api::api, ffi};
+use crate::ffi;
 
 pub type VideoFormat = ffi::VSVideoFormat;
 pub type AudioFormat = ffi::VSAudioFormat;
 
-struct FormatName {
-    buffer: [u8; 32],
+pub(crate) struct FormatName {
+    pub buffer: [u8; 32],
 }
 
 impl FormatName {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self { buffer: [0; 32] }
     }
 }
@@ -21,31 +21,5 @@ impl Display for FormatName {
         cstr.to_str()
             .map_err(|_| std::fmt::Error)
             .and_then(|s| f.write_str(s))
-    }
-}
-
-pub trait FormatExt {
-    fn name(&self) -> Option<String>;
-}
-
-impl FormatExt for VideoFormat {
-    fn name(&self) -> Option<String> {
-        let mut buffer = FormatName::new();
-        if 0 == unsafe { (api().getVideoFormatName)(self, buffer.buffer.as_mut_ptr().cast()) } {
-            None
-        } else {
-            Some(buffer.to_string())
-        }
-    }
-}
-
-impl FormatExt for AudioFormat {
-    fn name(&self) -> Option<String> {
-        let mut buffer = FormatName::new();
-        if 0 == unsafe { (api().getAudioFormatName)(self, buffer.buffer.as_mut_ptr().cast()) } {
-            None
-        } else {
-            Some(buffer.to_string())
-        }
     }
 }

@@ -760,7 +760,7 @@ pub struct VSPLUGINAPI {
     ) -> c_int,
 }
 
-/// Contains information about a [`VSCore`] instance.
+/// Specifies the dependency of a filter on other nodes.
 #[repr(C)]
 #[derive(Eq, PartialEq, Hash, Debug)]
 pub struct VSFilterDependency {

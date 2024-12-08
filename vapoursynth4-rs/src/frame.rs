@@ -6,7 +6,7 @@
 
 use std::ptr::NonNull;
 
-use crate::{api::api, ffi, map::MapRef};
+use crate::{api::Api, ffi, map::MapRef};
 
 mod context;
 mod format;
@@ -15,177 +15,175 @@ pub use context::*;
 pub use format::*;
 
 pub trait Frame: Sized + internal::FrameFromPtr {
-    #[must_use]
-    fn as_ptr(&self) -> *const ffi::VSFrame;
+    #[doc(hidden)]
+    fn api(&self) -> Api;
 
     #[must_use]
-    fn as_mut_ptr(&mut self) -> *mut ffi::VSFrame;
+    fn as_ptr(&self) -> *mut ffi::VSFrame;
 
     #[must_use]
-    fn properties(&self) -> Option<&MapRef> {
+    #[inline]
+    fn properties(&self) -> Option<MapRef> {
         unsafe {
-            let ptr = (api().getFramePropertiesRO)(self.as_ptr());
-            NonNull::new(ptr.cast_mut()).map(|x| MapRef::from_ptr(x.as_ptr()))
+            let ptr = (self.api().getFramePropertiesRO)(self.as_ptr());
+            NonNull::new(ptr.cast_mut()).map(|x| MapRef::from_ptr(x.as_ptr(), self.api()))
         }
     }
 
     #[must_use]
-    fn properties_mut(&mut self) -> Option<&mut MapRef> {
+    #[inline]
+    fn properties_mut(&mut self) -> Option<MapRef> {
         unsafe {
-            let ptr = (api().getFramePropertiesRW)(self.as_mut_ptr());
-            NonNull::new(ptr).map(|x| MapRef::from_ptr_mut(x.as_ptr()))
+            let ptr = (self.api().getFramePropertiesRW)(self.as_ptr());
+            NonNull::new(ptr).map(|x| MapRef::from_ptr(x.as_ptr(), self.api()))
         }
     }
 }
 
 pub(crate) mod internal {
+    use crate::api::Api;
+
     use super::ffi;
 
     pub trait FrameFromPtr {
-        unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self;
+        unsafe fn from_ptr(ptr: *const ffi::VSFrame, api: Api) -> Self;
     }
 }
+use internal::FrameFromPtr;
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct VideoFrame {
     handle: NonNull<ffi::VSFrame>,
+    api: Api,
 }
 
 impl internal::FrameFromPtr for VideoFrame {
-    unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self {
+    #[inline]
+    unsafe fn from_ptr(ptr: *const ffi::VSFrame, api: Api) -> Self {
         VideoFrame {
             handle: NonNull::new_unchecked(ptr.cast_mut()),
+            api,
         }
     }
 }
 impl Frame for VideoFrame {
-    fn as_ptr(&self) -> *const ffi::VSFrame {
-        self.handle.as_ptr()
+    #[inline]
+    fn api(&self) -> Api {
+        self.api
     }
 
-    fn as_mut_ptr(&mut self) -> *mut ffi::VSFrame {
+    #[inline]
+    fn as_ptr(&self) -> *mut ffi::VSFrame {
         self.handle.as_ptr()
     }
 }
 
 impl VideoFrame {
-    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self {
-        Self {
-            handle: NonNull::new_unchecked(ptr.cast_mut()),
-        }
-    }
-
     #[must_use]
     pub fn stride(&self, plane: i32) -> isize {
-        unsafe { (api().getStride)(self.as_ptr(), plane) }
+        unsafe { (self.api.getStride)(self.as_ptr(), plane) }
     }
 
     #[must_use]
     pub fn plane(&self, plane: i32) -> *const u8 {
-        unsafe { (api().getReadPtr)(self.as_ptr(), plane) }
+        unsafe { (self.api.getReadPtr)(self.as_ptr(), plane) }
     }
 
     #[must_use]
     pub fn plane_mut(&mut self, plane: i32) -> *mut u8 {
-        unsafe { (api().getWritePtr)(self.as_mut_ptr(), plane) }
+        unsafe { (self.api.getWritePtr)(self.as_ptr(), plane) }
     }
 
     #[must_use]
     pub fn get_video_format(&self) -> &VideoFormat {
         // safety: `vf` is valid if the node is a video node
-        unsafe { &*(api().getVideoFrameFormat)(self.as_ptr()) }
+        unsafe { &*(self.api.getVideoFrameFormat)(self.as_ptr()) }
     }
 
     #[must_use]
     pub fn get_audio_format(&self) -> &AudioFormat {
         // safety: `af` is valid if the node is an audio node
-        unsafe { &*(api().getAudioFrameFormat)(self.as_ptr()) }
+        unsafe { &*(self.api.getAudioFrameFormat)(self.as_ptr()) }
     }
 
     #[must_use]
     pub fn get_type(&self) -> MediaType {
-        unsafe { (api().getFrameType)(self.as_ptr()) }
+        unsafe { (self.api.getFrameType)(self.as_ptr()) }
     }
 
     #[must_use]
     pub fn frame_width(&self, plane: i32) -> i32 {
-        unsafe { (api().getFrameWidth)(self.as_ptr(), plane) }
+        unsafe { (self.api.getFrameWidth)(self.as_ptr(), plane) }
     }
 
     #[must_use]
     pub fn frame_height(&self, plane: i32) -> i32 {
-        unsafe { (api().getFrameHeight)(self.as_ptr(), plane) }
+        unsafe { (self.api.getFrameHeight)(self.as_ptr(), plane) }
     }
 }
 
 impl Clone for VideoFrame {
     fn clone(&self) -> Self {
-        unsafe { Self::from_ptr((api().addFrameRef)(self.handle.as_ptr())) }
+        unsafe { Self::from_ptr((self.api.addFrameRef)(self.handle.as_ptr()), self.api) }
     }
 }
 
 impl Drop for VideoFrame {
     fn drop(&mut self) {
-        unsafe { (api().freeFrame)(self.handle.as_ptr()) }
+        unsafe { (self.api.freeFrame)(self.handle.as_ptr()) }
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct AudioFrame {
     handle: NonNull<ffi::VSFrame>,
+    api: Api,
 }
 
 impl internal::FrameFromPtr for AudioFrame {
-    unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self {
+    unsafe fn from_ptr(ptr: *const ffi::VSFrame, api: Api) -> Self {
         AudioFrame {
             handle: NonNull::new_unchecked(ptr.cast_mut()),
+            api,
         }
     }
 }
 impl Frame for AudioFrame {
-    fn as_ptr(&self) -> *const ffi::VSFrame {
-        self.handle.as_ptr()
+    fn api(&self) -> Api {
+        self.api
     }
 
-    fn as_mut_ptr(&mut self) -> *mut ffi::VSFrame {
+    fn as_ptr(&self) -> *mut ffi::VSFrame {
         self.handle.as_ptr()
     }
 }
 
 impl AudioFrame {
-    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSFrame) -> Self {
-        Self {
-            handle: NonNull::new_unchecked(ptr.cast_mut()),
-        }
-    }
-
     #[must_use]
     pub fn channel(&self, channel: i32) -> *const u8 {
-        unsafe { (api().getReadPtr)(self.as_ptr(), channel) }
+        unsafe { (self.api.getReadPtr)(self.as_ptr(), channel) }
     }
 
     #[must_use]
     pub fn channel_mut(&mut self, channel: i32) -> *mut u8 {
-        unsafe { (api().getWritePtr)(self.as_mut_ptr(), channel) }
+        unsafe { (self.api.getWritePtr)(self.as_ptr(), channel) }
     }
 
     #[must_use]
     pub fn frame_length(&self) -> i32 {
-        unsafe { (api().getFrameLength)(self.as_ptr()) }
+        unsafe { (self.api.getFrameLength)(self.as_ptr()) }
     }
 }
 
 impl Clone for AudioFrame {
     fn clone(&self) -> Self {
-        unsafe { Self::from_ptr((api().addFrameRef)(self.handle.as_ptr())) }
+        unsafe { Self::from_ptr((self.api.addFrameRef)(self.handle.as_ptr()), self.api) }
     }
 }
 
 impl Drop for AudioFrame {
     fn drop(&mut self) {
-        unsafe { (api().freeFrame)(self.handle.as_ptr()) }
+        unsafe { (self.api.freeFrame)(self.handle.as_ptr()) }
     }
 }
 

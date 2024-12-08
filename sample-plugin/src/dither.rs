@@ -4,7 +4,7 @@ use vapoursynth4_rs::{
     core::CoreRef,
     frame::{FrameContext, VideoFrame},
     key,
-    map::{AppendMode, Map, MapRef, Value},
+    map::{AppendMode, MapRef, Value},
     node::{
         ActivationReason, Dependencies, Filter, FilterDependency, Node, RequestPattern, VideoNode,
     },
@@ -23,8 +23,8 @@ impl Filter for DitherFilter {
     type FilterData = ();
 
     fn create(
-        input: &MapRef,
-        output: &mut MapRef,
+        input: MapRef,
+        output: MapRef,
         _data: Option<Box<Self::FilterData>>,
         mut core: CoreRef,
     ) -> Result<(), Self::Error> {
@@ -39,7 +39,7 @@ impl Filter for DitherFilter {
         let Some(fmtc_plugin) = core.get_plugin_by_namespace(c"fmtc") else {
             return Err(c"Failed to find the fmtconv plugin.");
         };
-        let mut args = Map::new();
+        let mut args = core.create_map();
         args.set(
             key!(c"clip"),
             Value::VideoNode(node.clone()),
@@ -65,12 +65,12 @@ impl Filter for DitherFilter {
             vi.format.sub_sampling_h,
         );
 
-        let mut filter = DitherFilter {
+        let filter = DitherFilter {
             node: dithered_node,
         };
 
         let deps = [FilterDependency {
-            source: filter.node.as_mut_ptr(),
+            source: filter.node.as_ptr(),
             request_pattern: RequestPattern::StrictSpatial,
         }];
 
