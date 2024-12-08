@@ -2,6 +2,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     fmt::{Debug, Display},
     ops::Deref,
+    ptr,
 };
 
 use thiserror::Error;
@@ -40,7 +41,8 @@ impl Deref for Key {
     type Target = KeyStr;
 
     fn deref(&self) -> &Self::Target {
-        KeyStr::from_cstr(self.inner.as_c_str())
+        // SAFETY: Key is validated
+        unsafe { KeyStr::from_cstr_unchecked(self.inner.as_c_str()) }
     }
 }
 
@@ -54,6 +56,7 @@ impl From<&KeyStr> for Key {
 
 impl Display for Key {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // SAFETY: Key is validated
         unsafe { f.write_str(std::str::from_utf8_unchecked(self.inner.as_bytes())) }
     }
 }
@@ -67,7 +70,24 @@ pub struct KeyStr {
 impl KeyStr {
     #[must_use]
     pub const fn from_cstr(str: &CStr) -> &Self {
-        unsafe { &*(str as *const CStr as *const KeyStr) }
+        let mut i = 0;
+        let slice = str.to_bytes();
+        while i < slice.len() {
+            let c = slice[i];
+            assert!(
+                c.is_ascii_alphanumeric() || c == b'_',
+                "Key must be alphanumeric or underscore"
+            );
+            i += 1;
+        }
+        unsafe { Self::from_cstr_unchecked(str) }
+    }
+
+    #[must_use]
+    /// # Safety
+    /// The caller must ensure that the key is valid to contain only characters that are alphanumeric or underscore
+    pub const unsafe fn from_cstr_unchecked(str: &CStr) -> &Self {
+        &*(ptr::from_ref(str) as *const KeyStr)
     }
 
     pub(crate) unsafe fn from_ptr<'a>(ptr: *const c_char) -> &'a Self {
@@ -91,14 +111,9 @@ impl Display for KeyStr {
 
 #[macro_export]
 macro_rules! key {
-    ($s:expr) => {{
-        const OUTPUT_LEN: ::core::primitive::usize =
-            $crate::utils::__macro_impl::ToCStr($s).output_len();
-        const OUTPUT_BUF: [u8; OUTPUT_LEN] = $crate::utils::__macro_impl::ToCStr($s).const_eval();
-        const OUTPUT: &::core::ffi::CStr =
-            unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(&OUTPUT_BUF) };
-        $crate::map::KeyStr::from_cstr(OUTPUT)
-    }};
+    ($s:expr) => {
+        const { $crate::map::KeyStr::from_cstr($s) }
+    };
 }
 
 #[derive(Debug, Error)]

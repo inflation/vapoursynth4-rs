@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    api::API,
+    api::Api,
     core::CoreRef,
     frame::{Frame, FrameContext},
     map::MapRef,
@@ -16,18 +16,18 @@ use crate::{
 use super::{ffi, Filter};
 
 pub trait FilterExtern: Filter {
-    unsafe extern "system" fn filter_create(
+    unsafe extern "system-unwind" fn filter_create(
         in_: *const ffi::VSMap,
         out: *mut ffi::VSMap,
         user_data: *mut c_void,
         core: *mut ffi::VSCore,
         vsapi: *const ffi::VSAPI,
     ) {
-        API.set(vsapi);
+        let api = Api::from_ptr(vsapi);
 
-        let input = MapRef::from_ptr(in_);
-        let output = MapRef::from_ptr_mut(out);
-        let core = CoreRef::from_ptr(core);
+        let input = MapRef::from_ptr(in_, api);
+        let mut output = MapRef::from_ptr(out, api);
+        let core = CoreRef::from_ptr(core, api);
         let data = if user_data.is_null() {
             None
         } else {
@@ -47,7 +47,7 @@ pub trait FilterExtern: Filter {
         }
     }
 
-    unsafe extern "system" fn filter_get_frame(
+    unsafe extern "system-unwind" fn filter_get_frame(
         n: c_int,
         activation_reason: ffi::VSActivationReason,
         instance_data: *mut c_void,
@@ -56,14 +56,13 @@ pub trait FilterExtern: Filter {
         core: *mut ffi::VSCore,
         vsapi: *const ffi::VSAPI,
     ) -> *const ffi::VSFrame {
+        let api = Api::from_ptr(vsapi);
         let filter = instance_data.cast::<Self>().as_mut().unwrap_unchecked();
-        let mut ctx = AssertUnwindSafe(FrameContext::from_ptr(frame_ctx));
-        let core = CoreRef::from_ptr(core);
-        API.set(vsapi);
+        let mut ctx = AssertUnwindSafe(FrameContext::from_ptr(frame_ctx, api));
+        let core = CoreRef::from_ptr(core, api);
 
         let frame = std::panic::catch_unwind(|| {
-            let ctx = *ctx;
-            filter.get_frame(n, activation_reason, frame_data, ctx, core)
+            filter.get_frame(n, activation_reason, frame_data, *ctx, core)
         });
         match frame {
             Ok(Ok(Some(frame))) => {
@@ -84,14 +83,14 @@ pub trait FilterExtern: Filter {
         null()
     }
 
-    unsafe extern "system" fn filter_free(
+    unsafe extern "system-unwind" fn filter_free(
         instance_data: *mut c_void,
         core: *mut ffi::VSCore,
         vsapi: *const ffi::VSAPI,
     ) {
+        let api = Api::from_ptr(vsapi);
         let filter = Box::from_raw(instance_data.cast::<Self>());
-        let core = CoreRef::from_ptr(core);
-        API.set(vsapi);
+        let core = CoreRef::from_ptr(core, api);
 
         filter.free(core);
     }

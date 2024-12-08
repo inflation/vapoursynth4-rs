@@ -19,7 +19,7 @@ where
     /// Filter error that can turned into a [`&CStr`](std::ffi::CStr)
     type Error: AsRef<CStr>;
     type FrameType: Frame;
-    type FilterData;
+    type FilterData; // TODO: Ensure Send + Sync when FILTER_MODE is Parallel
 
     const NAME: &'static CStr;
     const ARGS: &'static CStr;
@@ -30,8 +30,8 @@ where
     /// Return [`Self::Error`] if anything happens during the filter creation.
     /// The error message will be passed to `VapourSynth`.
     fn create(
-        input: &MapRef,
-        output: &mut MapRef,
+        input: MapRef,
+        output: MapRef,
         data: Option<Box<Self::FilterData>>,
         core: CoreRef,
     ) -> Result<(), Self::Error>;
@@ -48,7 +48,10 @@ where
         frame_ctx: FrameContext,
         core: CoreRef,
     ) -> Result<Option<Self::FrameType>, Self::Error>;
-    fn free(self, _core: CoreRef) {}
+    /// Free the filter
+    fn free(self, core: CoreRef) {
+        let _ = core;
+    }
 }
 
 pub struct FilterRegister<F: Filter> {

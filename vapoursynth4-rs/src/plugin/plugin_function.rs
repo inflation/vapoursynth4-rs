@@ -1,18 +1,23 @@
 use std::{ffi::CStr, ptr::NonNull};
 
-use crate::{api::api, ffi};
+use crate::{api::Api, ffi};
 
 use super::Plugin;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct PluginFunction {
-    pub(crate) handle: NonNull<ffi::VSPluginFunction>,
+    handle: NonNull<ffi::VSPluginFunction>,
+    api: Api,
 }
 
 impl PluginFunction {
+    pub(crate) fn from_ptr(ptr: NonNull<ffi::VSPluginFunction>, api: Api) -> Self {
+        Self { handle: ptr, api }
+    }
+
     #[must_use]
-    pub fn new(handle: NonNull<ffi::VSPluginFunction>) -> Self {
-        Self { handle }
+    pub fn new(handle: NonNull<ffi::VSPluginFunction>, api: Api) -> Self {
+        Self { handle, api }
     }
 
     #[must_use]
@@ -23,7 +28,7 @@ impl PluginFunction {
     #[must_use]
     pub fn name(&self) -> &CStr {
         unsafe {
-            let ptr = (api().getPluginFunctionName)(self.as_ptr().cast_mut());
+            let ptr = (self.api.getPluginFunctionName)(self.as_ptr().cast_mut());
             CStr::from_ptr(ptr)
         }
     }
@@ -31,7 +36,7 @@ impl PluginFunction {
     #[must_use]
     pub fn arguments(&self) -> &CStr {
         unsafe {
-            let ptr = (api().getPluginFunctionArguments)(self.as_ptr().cast_mut());
+            let ptr = (self.api.getPluginFunctionArguments)(self.as_ptr().cast_mut());
             CStr::from_ptr(ptr)
         }
     }
@@ -39,7 +44,7 @@ impl PluginFunction {
     #[must_use]
     pub fn return_type(&self) -> &CStr {
         unsafe {
-            let ptr = (api().getPluginFunctionReturnType)(self.as_ptr().cast_mut());
+            let ptr = (self.api.getPluginFunctionReturnType)(self.as_ptr().cast_mut());
             CStr::from_ptr(ptr)
         }
     }
@@ -65,8 +70,11 @@ impl Iterator for Functions<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
-            let ptr = (api().getNextPluginFunction)(self.cursor, self.plugin.as_ptr().cast_mut());
-            NonNull::new(ptr).map(PluginFunction::new)
+            let ptr = (self.plugin.api.getNextPluginFunction)(
+                self.cursor,
+                self.plugin.as_ptr().cast_mut(),
+            );
+            NonNull::new(ptr).map(|p| PluginFunction::new(p, self.plugin.api))
         }
     }
 }

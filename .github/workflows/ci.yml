@@ -33,9 +33,7 @@ jobs:
         id: cache
         with:
           path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
+            target/
             vapoursynth-build/
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
       - name: Fetch VapourSynth
@@ -69,10 +67,8 @@ jobs:
         id: cache
         with:
           path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            vapoursynth/msvc_project/x64/Debug/
+            target/
+            vapoursynth/
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
       - name: Fetch VapourSynth
         uses: actions/checkout@v4

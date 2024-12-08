@@ -12,82 +12,81 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
+use bon::bon;
+use core_builder::State;
+
 use crate::{
-    api::{api, error::ApiNotSet, Api, API},
+    api::Api,
     ffi,
-    frame::{AudioFormat, AudioFrame, Frame, VideoFormat, VideoFrame},
+    frame::{
+        internal::FrameFromPtr, AudioFormat, AudioFrame, FormatName, Frame, VideoFormat, VideoFrame,
+    },
     function::Function,
-    map::MapRef,
+    map::{Map, MapRef},
     node::{internal::FilterExtern, Dependencies, Filter},
     plugin::{Plugin, Plugins},
     AudioInfo, ColorFamily, SampleType, VideoInfo,
 };
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CoreRef<'c> {
     handle: NonNull<ffi::VSCore>,
-    marker: PhantomData<&'c Core>,
+    api: Api,
+    marker: PhantomData<&'c ()>,
 }
 
-impl<'c> CoreRef<'c> {
+impl CoreRef<'_> {
     #[must_use]
-    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSCore) -> Self {
+    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSCore, api: Api) -> Self {
         Self {
             handle: NonNull::new_unchecked(ptr.cast_mut()),
+            api,
             marker: PhantomData,
         }
     }
 }
 
-impl<'c> Deref for CoreRef<'c> {
+impl AsRef<Core> for CoreRef<'_> {
+    fn as_ref(&self) -> &Core {
+        unsafe { &*std::ptr::from_ref(self).cast() }
+    }
+}
+
+impl Deref for CoreRef<'_> {
     type Target = Core;
 
-    fn deref(&self) -> &'c Self::Target {
-        unsafe { &*(self as *const CoreRef<'c>).cast() }
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*std::ptr::from_ref(self).cast() }
     }
 }
 
-impl<'c> DerefMut for CoreRef<'c> {
-    fn deref_mut(&mut self) -> &'c mut Self::Target {
-        unsafe { &mut *(self as *mut CoreRef<'c>).cast() }
+impl DerefMut for CoreRef<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *std::ptr::from_mut(self).cast() }
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-#[repr(transparent)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Core {
     handle: NonNull<ffi::VSCore>,
+    api: Api,
 }
 
 impl Core {
-    unsafe fn new_with(flags: i32, vsapi: *const ffi::VSAPI) -> Self {
-        API.set(vsapi);
-        let core = unsafe { ((*vsapi).createCore)(flags) };
-        Self {
-            handle: NonNull::new_unchecked(core),
-        }
-    }
-
     #[must_use]
-    pub fn as_ptr(&self) -> *const ffi::VSCore {
-        self.handle.as_ptr()
-    }
-
-    #[must_use]
-    pub fn as_mut_ptr(&mut self) -> *mut ffi::VSCore {
+    pub fn as_ptr(&self) -> *mut ffi::VSCore {
         self.handle.as_ptr()
     }
 
     pub fn set_max_cache_size(&mut self, size: i64) {
         unsafe {
-            (api().setMaxCacheSize)(size, self.as_mut_ptr());
+            (self.api.setMaxCacheSize)(size, self.as_ptr());
         }
     }
 
     pub fn set_thread_count(&mut self, count: i32) {
         unsafe {
-            (api().setThreadCount)(count, self.as_mut_ptr());
+            (self.api.setThreadCount)(count, self.as_ptr());
         }
     }
 
@@ -95,7 +94,7 @@ impl Core {
     pub fn get_info(&self) -> ffi::VSCoreInfo {
         unsafe {
             let mut info = MaybeUninit::uninit();
-            (api().getCoreInfo)(self.as_ptr().cast_mut(), info.as_mut_ptr());
+            (self.api.getCoreInfo)(self.as_ptr(), info.as_mut_ptr());
             info.assume_init()
         }
     }
@@ -105,7 +104,7 @@ impl Core {
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_video_filter<F: Filter>(
         &mut self,
-        out: &mut MapRef,
+        out: MapRef,
         name: &CStr,
         info: &VideoInfo,
         filter: Box<F>,
@@ -113,8 +112,8 @@ impl Core {
     ) {
         debug_assert!(!out.as_ptr().is_null());
         unsafe {
-            (api().createVideoFilter)(
-                out.as_mut_ptr(),
+            (self.api.createVideoFilter)(
+                out.as_ptr(),
                 name.as_ptr(),
                 info,
                 F::filter_get_frame,
@@ -123,7 +122,7 @@ impl Core {
                 dependencies.as_ptr(),
                 dependencies.len().try_into().unwrap(),
                 Box::into_raw(filter).cast(),
-                self.as_mut_ptr(),
+                self.as_ptr(),
             );
         }
     }
@@ -141,8 +140,8 @@ impl Core {
     ) {
         let filter = Box::new(filter);
         unsafe {
-            (api().createAudioFilter)(
-                out.as_mut_ptr(),
+            (self.api.createAudioFilter)(
+                out.as_ptr(),
                 name.as_ptr(),
                 info,
                 F::filter_get_frame,
@@ -151,7 +150,7 @@ impl Core {
                 dependencies.as_ptr(),
                 dependencies.len().try_into().unwrap(),
                 Box::into_raw(filter).cast(),
-                self.as_mut_ptr(),
+                self.as_ptr(),
             );
         }
     }
@@ -165,14 +164,14 @@ impl Core {
         prop_src: Option<&VideoFrame>,
     ) -> VideoFrame {
         unsafe {
-            let ptr = (api().newVideoFrame)(
+            let ptr = (self.api.newVideoFrame)(
                 format,
                 width,
                 height,
-                prop_src.map_or(null_mut(), Frame::as_ptr),
-                self.as_ptr().cast_mut(),
+                prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
+                self.as_ptr(),
             );
-            VideoFrame::from_ptr(ptr)
+            VideoFrame::from_ptr(ptr, self.api)
         }
     }
 
@@ -187,16 +186,16 @@ impl Core {
         prop_src: Option<&VideoFrame>,
     ) -> VideoFrame {
         unsafe {
-            let ptr = (api().newVideoFrame2)(
+            let ptr = (self.api.newVideoFrame2)(
                 format,
                 width,
                 height,
                 plane_src.as_ptr(),
                 planes.as_ptr(),
-                prop_src.map_or(null_mut(), Frame::as_ptr),
-                self.as_ptr().cast_mut(),
+                prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
+                self.as_ptr(),
             );
-            VideoFrame::from_ptr(ptr)
+            VideoFrame::from_ptr(ptr, self.api)
         }
     }
 
@@ -208,13 +207,13 @@ impl Core {
         prop_src: Option<&AudioFrame>,
     ) -> AudioFrame {
         unsafe {
-            let ptr = (api().newAudioFrame)(
+            let ptr = (self.api.newAudioFrame)(
                 format,
                 num_samples,
-                prop_src.map_or(null_mut(), Frame::as_ptr),
-                self.as_ptr().cast_mut(),
+                prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
+                self.as_ptr(),
             );
-            AudioFrame::from_ptr(ptr)
+            AudioFrame::from_ptr(ptr, self.api)
         }
     }
 
@@ -228,21 +227,26 @@ impl Core {
         prop_src: Option<&AudioFrame>,
     ) -> AudioFrame {
         unsafe {
-            let ptr = (api().newAudioFrame2)(
+            let ptr = (self.api.newAudioFrame2)(
                 format,
                 num_samples,
                 channel_src.as_ptr(),
                 channels.as_ptr(),
-                prop_src.map_or(null_mut(), Frame::as_ptr),
-                self.as_ptr().cast_mut(),
+                prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
+                self.as_ptr(),
             );
-            AudioFrame::from_ptr(ptr)
+            AudioFrame::from_ptr(ptr, self.api)
         }
     }
 
     #[must_use]
     pub fn copy_frame<F: Frame>(&self, frame: &F) -> F {
-        unsafe { F::from_ptr((api().copyFrame)(frame.as_ptr(), self.as_ptr().cast_mut())) }
+        unsafe {
+            F::from_ptr(
+                (self.api.copyFrame)(frame.as_ptr(), self.as_ptr()),
+                self.api,
+            )
+        }
     }
 
     #[must_use]
@@ -256,16 +260,27 @@ impl Core {
     ) -> VideoFormat {
         unsafe {
             let mut format = MaybeUninit::uninit();
-            (api().queryVideoFormat)(
+            (self.api.queryVideoFormat)(
                 format.as_mut_ptr(),
                 color_family,
                 sample_type,
                 bits_per_sample,
                 subsampling_w,
                 subsampling_h,
-                self.as_ptr().cast_mut(),
+                self.as_ptr(),
             );
             format.assume_init()
+        }
+    }
+
+    #[must_use]
+    pub fn get_video_format_name(&self, format: &VideoFormat) -> Option<String> {
+        let mut buffer = FormatName::new();
+        if 0 == unsafe { (self.api.getVideoFormatName)(format, buffer.buffer.as_mut_ptr().cast()) }
+        {
+            None
+        } else {
+            Some(buffer.to_string())
         }
     }
 
@@ -278,14 +293,25 @@ impl Core {
     ) -> AudioFormat {
         unsafe {
             let mut format = MaybeUninit::uninit();
-            (api().queryAudioFormat)(
+            (self.api.queryAudioFormat)(
                 format.as_mut_ptr(),
                 sample_type,
                 bits_per_sample,
                 channel_layout,
-                self.as_ptr().cast_mut(),
+                self.as_ptr(),
             );
             format.assume_init()
+        }
+    }
+
+    #[must_use]
+    pub fn get_audio_format_name(&self, format: &AudioFormat) -> Option<String> {
+        let mut buffer = FormatName::new();
+        if 0 == unsafe { (self.api.getAudioFormatName)(format, buffer.buffer.as_mut_ptr().cast()) }
+        {
+            None
+        } else {
+            Some(buffer.to_string())
         }
     }
 
@@ -299,13 +325,13 @@ impl Core {
         subsampling_h: i32,
     ) -> u32 {
         unsafe {
-            (api().queryVideoFormatID)(
+            (self.api.queryVideoFormatID)(
                 color_family,
                 sample_type,
                 bits_per_sample,
                 subsampling_w,
                 subsampling_h,
-                self.as_ptr().cast_mut(),
+                self.as_ptr(),
             )
         }
     }
@@ -314,7 +340,7 @@ impl Core {
     pub fn get_video_format_by_id(&self, id: u32) -> VideoFormat {
         unsafe {
             let mut format = MaybeUninit::uninit();
-            (api().getVideoFormatByID)(format.as_mut_ptr(), id, self.as_ptr().cast_mut());
+            (self.api.getVideoFormatByID)(format.as_mut_ptr(), id, self.as_ptr());
             format.assume_init()
         }
     }
@@ -326,29 +352,26 @@ impl Core {
         free: ffi::VSFreeFunctionData,
     ) -> Function {
         unsafe {
-            Function::from_ptr((api().createFunction)(
-                func,
-                Box::into_raw(data).cast(),
-                free,
-                self.as_mut_ptr(),
-            ))
+            Function::from_ptr(
+                (self.api.createFunction)(func, Box::into_raw(data).cast(), free, self.as_ptr()),
+                self.api,
+            )
         }
     }
 
+    #[must_use]
     pub fn get_plugin_by_id(&self, id: &CStr) -> Option<Plugin> {
         unsafe {
-            NonNull::new((api().getPluginByID)(id.as_ptr(), self.as_ptr().cast_mut()))
-                .map(Plugin::new)
+            NonNull::new((self.api.getPluginByID)(id.as_ptr(), self.as_ptr()))
+                .map(|p| Plugin::new(p, self.api))
         }
     }
 
+    #[must_use]
     pub fn get_plugin_by_namespace(&self, ns: &CStr) -> Option<Plugin> {
         unsafe {
-            NonNull::new((api().getPluginByNamespace)(
-                ns.as_ptr(),
-                self.as_ptr().cast_mut(),
-            ))
-            .map(Plugin::new)
+            NonNull::new((self.api.getPluginByNamespace)(ns.as_ptr(), self.as_ptr()))
+                .map(|p| Plugin::new(p, self.api))
         }
     }
 
@@ -359,7 +382,7 @@ impl Core {
 
     pub fn log(&mut self, level: ffi::VSMessageType, msg: &CStr) {
         unsafe {
-            (api().logMessage)(level, msg.as_ptr(), self.as_mut_ptr());
+            (self.api.logMessage)(level, msg.as_ptr(), self.as_ptr());
         }
     }
 }
@@ -367,71 +390,75 @@ impl Core {
 impl Drop for Core {
     fn drop(&mut self) {
         unsafe {
-            (api().freeCore)(self.handle.as_ptr());
+            (self.api.freeCore)(self.handle.as_ptr());
         }
     }
 }
 
-#[derive(Debug, Default)]
-pub struct CoreBuilder<'api> {
-    flags: i32,
-    max_cache_size: Option<i64>,
-    thread_count: Option<i32>,
-    api: Option<&'api Api>,
-}
+// MARK: Helper
 
-impl<'api> CoreBuilder<'api> {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+impl Core {
+    unsafe fn new_with(flags: i32, api: Api) -> Self {
+        let core = unsafe { (api.createCore)(flags) };
+        Self {
+            handle: NonNull::new_unchecked(core),
+            api,
+        }
     }
 
-    /// # Errors
-    ///
-    /// Return [`ApiNotSet`] if the API is not set.
-    pub fn build(&mut self) -> Result<Core, ApiNotSet> {
-        let Some(api) = self.api else {
-            return Err(ApiNotSet {});
-        };
+    #[must_use]
+    pub fn api(&self) -> Api {
+        self.api
+    }
 
-        let mut core = unsafe { Core::new_with(self.flags, api.into()) };
-        if let Some(size) = self.max_cache_size {
+    #[must_use]
+    pub fn create_map(&self) -> Map {
+        unsafe {
+            let ptr = (self.api.createMap)();
+            Map::from_ptr(ptr, self.api)
+        }
+    }
+}
+
+// MARK: Builder
+
+#[bon]
+impl Core {
+    #[builder]
+    pub fn new(
+        #[builder(field)] flags: i32,
+        max_cache_size: Option<i64>,
+        thread_count: Option<i32>,
+        #[cfg(feature = "link-library")]
+        #[builder(default)]
+        api: Api,
+        #[cfg(not(feature = "link-library"))] api: Api,
+    ) -> Self {
+        let mut core = unsafe { Core::new_with(flags, api) };
+        if let Some(size) = max_cache_size {
             core.set_max_cache_size(size);
         }
-        if let Some(count) = self.thread_count {
+        if let Some(count) = thread_count {
             core.set_thread_count(count);
         }
 
-        Ok(core)
+        core
     }
+}
 
-    pub fn api(&mut self, api: &'api Api) -> &mut Self {
-        self.api = Some(api);
-        self
-    }
-
-    pub fn enable_graph_inspection(&mut self) -> &mut Self {
+impl<S: State> CoreBuilder<S> {
+    pub fn enable_graph_inspection(mut self) -> Self {
         self.flags |= ffi::VSCoreCreationFlags::EnableGraphInspection as i32;
         self
     }
 
-    pub fn disable_auto_loading(&mut self) -> &mut Self {
+    pub fn disable_auto_loading(mut self) -> Self {
         self.flags |= ffi::VSCoreCreationFlags::DisableAutoLoading as i32;
         self
     }
 
-    pub fn disable_library_unloading(&mut self) -> &mut Self {
+    pub fn disable_library_unloading(mut self) -> Self {
         self.flags |= ffi::VSCoreCreationFlags::DisableLibraryUnloading as i32;
-        self
-    }
-
-    pub fn max_cache_size(&mut self, size: i64) -> &mut Self {
-        self.max_cache_size = Some(size);
-        self
-    }
-
-    pub fn thread_count(&mut self, count: i32) -> &mut Self {
-        self.thread_count = Some(count);
         self
     }
 }
@@ -439,27 +466,20 @@ impl<'api> CoreBuilder<'api> {
 #[cfg(test)]
 #[cfg(feature = "link-library")]
 mod tests {
-    use std::ptr::addr_of;
-    use testresult::TestResult;
-
     use super::*;
 
     #[test]
-    fn builder() -> TestResult {
-        unsafe { API.set_default() }?;
-        let core = unsafe {
-            CoreBuilder::new()
-                .api(&*addr_of!(API))
-                .enable_graph_inspection()
-                .disable_auto_loading()
-                .disable_library_unloading()
-                .max_cache_size(1024)
-                .thread_count(4)
-                .build()?
-        };
+    fn builder() {
+        let api = Api::default();
+        let core = Core::builder()
+            .api(api)
+            .enable_graph_inspection()
+            .disable_auto_loading()
+            .disable_library_unloading()
+            .max_cache_size(1024)
+            .thread_count(4)
+            .build();
         assert_eq!(core.get_info().max_framebuffer_size, 1024);
         assert_eq!(core.get_info().num_threads, 4);
-
-        Ok(())
     }
 }

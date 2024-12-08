@@ -1,14 +1,9 @@
 pub mod plugin_function;
 pub mod types;
 
-use std::{ffi::CStr, ptr::NonNull};
+use std::{borrow::Borrow, ffi::CStr, ptr::NonNull};
 
-use crate::{
-    api::api,
-    core::Core,
-    ffi,
-    map::{Map, MapRef},
-};
+use crate::{api::Api, core::Core, ffi, map::Map};
 
 pub use plugin_function::*;
 pub use types::*;
@@ -16,12 +11,13 @@ pub use types::*;
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Plugin {
     handle: NonNull<ffi::VSPlugin>,
+    api: Api,
 }
 
 impl Plugin {
     #[must_use]
-    pub fn new(handle: NonNull<ffi::VSPlugin>) -> Self {
-        Self { handle }
+    pub fn new(handle: NonNull<ffi::VSPlugin>, api: Api) -> Self {
+        Self { handle, api }
     }
 
     #[must_use]
@@ -32,7 +28,7 @@ impl Plugin {
     #[must_use]
     pub fn name(&self) -> &CStr {
         unsafe {
-            let ptr = (api().getPluginName)(self.as_ptr().cast_mut());
+            let ptr = (self.api.getPluginName)(self.as_ptr().cast_mut());
             CStr::from_ptr(ptr)
         }
     }
@@ -40,7 +36,7 @@ impl Plugin {
     #[must_use]
     pub fn id(&self) -> &CStr {
         unsafe {
-            let ptr = (api().getPluginID)(self.as_ptr().cast_mut());
+            let ptr = (self.api.getPluginID)(self.as_ptr().cast_mut());
             CStr::from_ptr(ptr)
         }
     }
@@ -48,17 +44,20 @@ impl Plugin {
     #[must_use]
     pub fn namespace(&self) -> &CStr {
         unsafe {
-            let ptr = (api().getPluginNamespace)(self.as_ptr().cast_mut());
+            let ptr = (self.api.getPluginNamespace)(self.as_ptr().cast_mut());
             CStr::from_ptr(ptr)
         }
     }
 
     #[must_use]
-    pub fn invoke(&self, name: &CStr, args: &MapRef) -> Map {
-        debug_assert!(!args.as_ptr().is_null());
+    pub fn invoke(&self, name: &CStr, args: impl Borrow<Map>) -> Map {
         unsafe {
-            let ptr = (api().invoke)(self.as_ptr().cast_mut(), name.as_ptr(), args.as_ptr());
-            Map::from_ptr(ptr)
+            let ptr = (self.api.invoke)(
+                self.as_ptr().cast_mut(),
+                name.as_ptr(),
+                args.borrow().as_ptr(),
+            );
+            Map::from_ptr(ptr, self.api)
         }
     }
 
@@ -70,25 +69,25 @@ impl Plugin {
     #[must_use]
     pub fn get_function_by_name(&self, name: &CStr) -> Option<PluginFunction> {
         unsafe {
-            NonNull::new((api().getPluginFunctionByName)(
+            NonNull::new((self.api.getPluginFunctionByName)(
                 name.as_ptr(),
                 self.as_ptr().cast_mut(),
             ))
         }
-        .map(|handle| PluginFunction { handle })
+        .map(|handle| PluginFunction::from_ptr(handle, self.api))
     }
 
     #[must_use]
     pub fn path(&self) -> &CStr {
         unsafe {
-            let ptr = (api().getPluginPath)(self.as_ptr().cast_mut());
+            let ptr = (self.api.getPluginPath)(self.as_ptr().cast_mut());
             CStr::from_ptr(ptr)
         }
     }
 
     #[must_use]
     pub fn version(&self) -> i32 {
-        unsafe { (api().getPluginVersion)(self.as_ptr().cast_mut()) }
+        unsafe { (self.api.getPluginVersion)(self.as_ptr().cast_mut()) }
     }
 }
 
@@ -112,8 +111,9 @@ impl Iterator for Plugins<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
-            let ptr = (api().getNextPlugin)(self.cursor, self.core.as_ptr().cast_mut());
-            NonNull::new(ptr).map(Plugin::new)
+            let api = self.core.api();
+            let ptr = (api.getNextPlugin)(self.cursor, self.core.as_ptr());
+            NonNull::new(ptr).map(|p| Plugin::new(p, api))
         }
     }
 }
@@ -126,14 +126,14 @@ macro_rules! declare_plugin {
         $(, ($filter:tt, $data:expr) )*
     ) => {
         #[no_mangle]
-        pub unsafe extern "system" fn VapourSynthPluginInit2(
+        pub unsafe extern "system-unwind" fn VapourSynthPluginInit2(
             plugin: *mut $crate::ffi::VSPlugin,
             vspapi: *const $crate::ffi::VSPLUGINAPI,
         ) {
             ((*vspapi).configPlugin)(
-                cstr!($id).as_ptr(),
-                cstr!($name).as_ptr(),
-                cstr!($desc).as_ptr(),
+                $id.as_ptr(),
+                $name.as_ptr(),
+                $desc.as_ptr(),
                 $crate::utils::make_version($version.0, $version.1),
                 $crate::VAPOURSYNTH_API_VERSION,
                 $flags,

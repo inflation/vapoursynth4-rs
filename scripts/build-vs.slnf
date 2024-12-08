@@ -1,0 +1,10 @@
+{
+  "solution": {
+    "path": "..\\vapoursynth\\msvc_project\\VapourSynth.sln",
+    "projects": [
+      "..\\zimg\\_msvc\\zimg\\zimg.vcxproj",
+      "Core\\Core.vcxproj",
+      "VSScript\\VSScript.vcxproj"
+    ]
+  }
+}

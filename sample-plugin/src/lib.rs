@@ -2,7 +2,6 @@ mod dither;
 
 use std::ffi::{c_void, CStr};
 
-use const_str::cstr;
 use dither::DitherFilter;
 use vapoursynth4_rs::{
     core::CoreRef,
@@ -27,13 +26,13 @@ impl Filter for DumbFilter {
     type FilterData = ();
 
     fn create(
-        input: &MapRef,
-        output: &mut MapRef,
+        input: MapRef,
+        output: MapRef,
         _data: Option<Box<Self::FilterData>>,
         mut core: CoreRef,
     ) -> Result<(), Self::Error> {
-        let Ok(node) = input.get_video_node(key!("clip"), 0) else {
-            return Err(cstr!("Failed to get clip"));
+        let Ok(node) = input.get_video_node(key!(c"clip"), 0) else {
+            return Err(c"Failed to get clip");
         };
         let n = node.clone();
         let vi = n.info();
@@ -42,27 +41,25 @@ impl Filter for DumbFilter {
             || vi.format.sample_type != SampleType::Integer
             || vi.format.bits_per_sample != 8
         {
-            return Err(cstr!(
-                "Invert: only constant format 8bit integer input supported"
-            ));
+            return Err(c"Invert: only constant format 8bit integer input supported");
         }
 
-        let mut filter = DumbFilter {
+        let filter = DumbFilter {
             node,
             enabled: input
-                .get_int(key!("enabled"), 0)
+                .get_int(key!(c"enabled"), 0)
                 .map(|v| v != 0)
                 .unwrap_or(true),
         };
 
         let deps = [FilterDependency {
-            source: filter.node.as_mut_ptr(),
+            source: filter.node.as_ptr(),
             request_pattern: RequestPattern::StrictSpatial,
         }];
 
         core.create_video_filter(
             output,
-            cstr!("Invert"),
+            c"Invert",
             vi,
             Box::new(filter),
             Dependencies::new(&deps).unwrap(),
@@ -123,15 +120,15 @@ impl Filter for DumbFilter {
         Ok(None)
     }
 
-    const NAME: &'static CStr = cstr!("Filter");
-    const ARGS: &'static CStr = cstr!("clip:vnode;enabled:int:opt;");
-    const RETURN_TYPE: &'static CStr = cstr!("clip:vnode;");
+    const NAME: &'static CStr = c"Filter";
+    const ARGS: &'static CStr = c"clip:vnode;enabled:int:opt;";
+    const RETURN_TYPE: &'static CStr = c"clip:vnode;";
 }
 
 declare_plugin!(
-    "com.example.invert",
-    "invert",
-    "VapourSynth Filter Skeleton",
+    c"com.example.invert",
+    c"invert",
+    c"VapourSynth Filter Skeleton",
     (1, 0),
     vapoursynth4_rs::VAPOURSYNTH_API_VERSION,
     0,

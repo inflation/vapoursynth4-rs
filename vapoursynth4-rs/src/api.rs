@@ -4,56 +4,59 @@
  file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::ops::Deref;
+
+#[cfg(feature = "link-library")]
+use vapoursynth4_sys::vs_make_version;
 
 use crate::ffi;
 
-#[cfg(test)]
 #[cfg(feature = "link-library")]
 use self::error::ApiNotFound;
 
-pub(crate) static mut API: Api = Api::null();
-
-pub(crate) fn api() -> &'static ffi::VSAPI {
-    unsafe { &*API.handle.load(Ordering::Acquire) }
-}
-
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-#[derive(Debug)]
-pub struct Api {
-    handle: AtomicPtr<ffi::VSAPI>,
-}
+pub struct Api(*const ffi::VSAPI);
 
 impl Api {
-    const fn null() -> Self {
-        Self {
-            handle: AtomicPtr::new(std::ptr::null_mut()),
-        }
-    }
-
-    pub(crate) fn set(&mut self, ptr: *const ffi::VSAPI) {
-        self.handle.store(ptr.cast_mut(), Ordering::Release);
-    }
-
-    #[cfg(test)]
+    /// Creates a new `Api` instance with the specified major and minor version.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ApiNotFound` if the requested API version is not supported by the linked `VapourSynth` library.
     #[cfg(feature = "link-library")]
-    pub(crate) fn set_default(&mut self) -> Result<(), ApiNotFound> {
-        let ptr = unsafe { ffi::getVapourSynthAPI(ffi::VAPOURSYNTH_API_VERSION) };
+    pub fn new(major: u16, minor: u16) -> Result<Self, ApiNotFound> {
+        let ptr = unsafe { ffi::getVapourSynthAPI(vs_make_version(major, minor)) };
         if ptr.is_null() {
-            Err(ApiNotFound {
-                major: ffi::VAPOURSYNTH_API_MAJOR,
-                minor: ffi::VAPOURSYNTH_API_MINOR,
-            })
+            Err(ApiNotFound { major, minor })
         } else {
-            self.set(ptr);
-            Ok(())
+            Ok(Self(ptr))
         }
+    }
+
+    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSAPI) -> Self {
+        Self(ptr)
     }
 }
 
-impl From<&Api> for *const ffi::VSAPI {
-    fn from(api: &Api) -> *const ffi::VSAPI {
-        api.handle.load(Ordering::Acquire)
+impl Deref for Api {
+    type Target = ffi::VSAPI;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.0 }
+    }
+}
+
+#[cfg(feature = "link-library")]
+impl Default for Api {
+    /// Creates a new `Api` instance with the default version.
+    ///
+    /// # Panics
+    ///
+    /// Internal error indicates that something went wrong with the linked `VapourSynth` library.
+    #[must_use]
+    fn default() -> Self {
+        Self::new(ffi::VAPOURSYNTH_API_MAJOR, ffi::VAPOURSYNTH_API_MINOR).unwrap()
     }
 }
 
@@ -69,8 +72,4 @@ pub mod error {
         pub major: u16,
         pub minor: u16,
     }
-
-    #[derive(Error, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    #[error("API is not set")]
-    pub struct ApiNotSet {}
 }
