@@ -1,6 +1,6 @@
 [package]
 name = "vapoursynth4-rs"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Inflation <me@shimotsuki.ink>"]
 description = "A safe wrapper for VapourSynth and VSScript API version 4"
@@ -13,7 +13,7 @@ repository = "https://github.com/inflation/vapoursynth4-rs"
 [dependencies]
 bon = "3.3.0"
 thiserror = "2.0.0"
-vapoursynth4-sys = {version = "0.2.0", path = "../vapoursynth4-sys"}
+vapoursynth4-sys = { version = "0.3.0", path = "../vapoursynth4-sys"}
 # vapoursynth4-rs-macros = { version = "0.1.0", path = "../vapoursynth4-rs-macros", optional = true}
 
 [dev-dependencies]
