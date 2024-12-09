@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -34,73 +34,27 @@ jobs:
         with:
           path: |
             target/
-            vapoursynth-build/
+            vapoursynth/build/
+            vapoursynth/msvc_project/x64/Debug/
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-      - name: Fetch VapourSynth
-        uses: actions/checkout@v4
-        with:
-          repository: vapoursynth/vapoursynth
-          path: vapoursynth
-          ref: R70
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      - name: Set scipt path
+        id: build-scripts
+        shell: bash
+        run: |
+          if [ ${{ matrix.os }} == 'windows-latest' ]; then
+            echo "BUILD_SCRIPT=scripts/build-vs.ps1" >> "$GITHUB_OUTPUT"
+          else
+            echo "BUILD_SCRIPT=scripts/build-vs.sh" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Setup msbuild (Windows)
+        uses: microsoft/setup-msbuild@v2
+        if: matrix.os == 'windows-latest'
       - name: Build VapourSynth in debug mode
-        run: bash scripts/build-vs.sh
+        run: ${{ steps.build-scripts.outputs.BUILD_SCRIPT }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Tests
         run: cargo nextest run --all-features --workspace
-        env:
-          VAPOURSYNTH_LIB_PATH: vapoursynth-build/lib
-          DYLD_LIBRARY_PATH: vapoursynth-build/lib
-
-  tests-windows:
-    name: Unit Tests (windows-latest)
-    timeout-minutes: 10
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-      - name: Dependency
-        run: cargo fetch
-      - uses: actions/cache@v4
-        id: cache
-        with:
-          path: |
-            target/
-            vapoursynth/
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-      - name: Fetch VapourSynth
-        uses: actions/checkout@v4
-        with:
-          repository: vapoursynth/vapoursynth
-          path: vapoursynth
-          ref: R70
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
-      - name: Fetch zimg
-        uses: actions/checkout@v4
-        with:
-          repository: sekrit-twc/zimg
-          path: vapoursynth/zimg
-          ref: release-3.0.5
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
-      - name: Install Python packages
-        run: |
-          python -m pip install -U pip
-          pip install -U cython 
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
-      - uses: microsoft/setup-msbuild@v2
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
-      - name: Build VapourSynth in debug mode
-        run: pwsh -Command ./scripts/build-vs.ps1
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-      - name: Tests
-        run: |
-          $env:VAPOURSYNTH_LIB_PATH="$PWD/vapoursynth/msvc_project/x64/Debug/"
-          $env:PATH="$env:VAPOURSYNTH_LIB_PATH;$env:PATH"
-          cargo nextest run --all-features --workspace
 
   coverage:
     name: Code Coverage
@@ -118,21 +72,11 @@ jobs:
         id: cache
         with:
           path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            vapoursynth-build/
+            target/
+            vapoursynth/build/
           key: ${{ runner.os }}-cargo-cov-${{ hashFiles('**/Cargo.lock') }}
-      - name: Fetch VapourSynth
-        uses: actions/checkout@v4
-        with:
-          repository: vapoursynth/vapoursynth
-          path: vapoursynth
-          ref: R66
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       - name: Build VapourSynth in debug mode
-        run: bash scripts/build-vs.sh
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+        run: scripts/build-vs.sh
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Install cargo-nextest
@@ -144,7 +88,7 @@ jobs:
             --ignore-filename-regex vapoursynth4-sys/
             --lcov --output-path lcov.info
         env:
-          VAPOURSYNTH_LIB_PATH: vapoursynth-build/lib
+          VAPOURSYNTH_LIB_PATH: vapoursynth/build/lib
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
@@ -168,21 +112,11 @@ jobs:
         id: cache
         with:
           path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            vapoursynth-build/
+            target/
+            vapoursynth/build/
           key: ${{ runner.os }}-cargo-sanitizer-${{ hashFiles('**/Cargo.lock') }}
-      - name: Fetch VapourSynth
-        uses: actions/checkout@v4
-        with:
-          repository: vapoursynth/vapoursynth
-          path: vapoursynth
-          ref: R66
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       - name: Build VapourSynth in debug mode
-        run: bash scripts/build-vs.sh
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+        run: scripts/build-vs.sh
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Address Sanitizer
@@ -192,7 +126,7 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
-          VAPOURSYNTH_LIB_PATH: vapoursynth-build/lib
+          VAPOURSYNTH_LIB_PATH: vapoursynth/build/lib
 
   clippy:
     name: Clippy
@@ -210,9 +144,7 @@ jobs:
         id: cache
         with:
           path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
+            target/
           key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
       - name: Run Clippy with reviewdog
         uses: giraffate/clippy-action@v1.0.1
