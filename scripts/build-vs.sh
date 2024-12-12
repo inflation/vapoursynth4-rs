@@ -6,16 +6,16 @@ export PREFIX="$PWD/vapoursynth/build"
 export VAPOURSYNTH_LIB_PATH="$PREFIX/lib"
 
 if [ ! -f "$VAPOURSYNTH_LIB_PATH/libvapoursynth.so" ]; then
-    rm -rf vapoursynth && git clone --depth 1 --branch R70 https://github.com/vapoursynth/vapoursynth
+    git clone --depth 1 --branch R70 https://github.com/vapoursynth/vapoursynth || true
 
     if [ "$RUNNER_OS" == "macOS" ]; then
-        brew install zimg automake libtool
+        brew install automake libtool
     fi
 
     pushd vapoursynth
 
     if [ ! -f "$VAPOURSYNTH_LIB_PATH/libzimg.a" ]; then
-        git clone --depth 1 --branch release-3.0.5 https://github.com/sekrit-twc/zimg
+        git clone --depth 1 --branch release-3.0.5 https://github.com/sekrit-twc/zimg || true
         pushd zimg
         ./autogen.sh
         ./configure --prefix="$PREFIX"
@@ -24,6 +24,8 @@ if [ ! -f "$VAPOURSYNTH_LIB_PATH/libvapoursynth.so" ]; then
         popd
     fi
 
+    python -m venv .venv
+    source .venv/bin/activate
     pip install Cython
 
     export PKG_CONFIG_PATH="$VAPOURSYNTH_LIB_PATH/pkgconfig"

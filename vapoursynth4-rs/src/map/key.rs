@@ -105,6 +105,7 @@ impl Deref for KeyStr {
 
 impl Display for KeyStr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // SAFETY: KeyStr is valid to contain only characters that are ascii alphanumeric or underscore
         unsafe { f.write_str(std::str::from_utf8_unchecked(self.inner.to_bytes())) }
     }
 }

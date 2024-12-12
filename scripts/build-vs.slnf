@@ -4,7 +4,8 @@
     "projects": [
       "..\\zimg\\_msvc\\zimg\\zimg.vcxproj",
       "Core\\Core.vcxproj",
-      "VSScript\\VSScript.vcxproj"
+      "VSScript\\VSScript.vcxproj",
+      "VSPipe\\VSPipe.vcxproj"
     ]
   }
 }
