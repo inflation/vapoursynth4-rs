@@ -1,6 +1,6 @@
 name: CI
 
-on: 
+on:
   push:
     branches:
       - master
@@ -82,13 +82,10 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Generate code coverage
-        run: 
-          cargo +nightly llvm-cov nextest
-            --all-features --workspace
-            --ignore-filename-regex vapoursynth4-sys/
-            --lcov --output-path lcov.info
-        env:
-          VAPOURSYNTH_LIB_PATH: vapoursynth/build/lib
+        run: cargo +nightly llvm-cov nextest
+          --all-features --workspace
+          --ignore-filename-regex vapoursynth4-sys/
+          --lcov --output-path lcov.info
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
@@ -120,13 +117,11 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Address Sanitizer
-        run: 
-          cargo +nightly nextest run
-            -Z build-std --target=x86_64-unknown-linux-gnu --all-features
+        run: cargo +nightly nextest run
+          -Z build-std --target=x86_64-unknown-linux-gnu --all-features
         env:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
-          VAPOURSYNTH_LIB_PATH: vapoursynth/build/lib
 
   clippy:
     name: Clippy

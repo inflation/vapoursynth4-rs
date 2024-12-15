@@ -18,9 +18,7 @@ use core_builder::State;
 use crate::{
     api::Api,
     ffi,
-    frame::{
-        internal::FrameFromPtr, AudioFormat, AudioFrame, FormatName, Frame, VideoFormat, VideoFrame,
-    },
+    frame::{AudioFormat, AudioFrame, FormatName, Frame, FrameType, VideoFormat, VideoFrame},
     function::Function,
     map::{Map, MapRef},
     node::{internal::FilterExtern, Dependencies, Filter},
@@ -103,7 +101,7 @@ impl Core {
     ///
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_video_filter<F: Filter>(
-        &mut self,
+        &self,
         out: MapRef,
         name: &CStr,
         info: &VideoInfo,
@@ -131,8 +129,8 @@ impl Core {
     ///
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_audio_filter<F: Filter>(
-        &mut self,
-        out: &mut MapRef,
+        &self,
+        out: &MapRef,
         name: &CStr,
         info: &AudioInfo,
         filter: F,
@@ -171,7 +169,7 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
                 self.as_ptr(),
             );
-            VideoFrame::from_ptr(ptr, self.api)
+            Frame::from_ptr(ptr, self.api)
         }
     }
 
@@ -240,9 +238,9 @@ impl Core {
     }
 
     #[must_use]
-    pub fn copy_frame<F: Frame>(&self, frame: &F) -> F {
+    pub fn copy_frame<F: FrameType>(&self, frame: &Frame<F>) -> Frame<F> {
         unsafe {
-            F::from_ptr(
+            Frame::<F>::from_ptr(
                 (self.api.copyFrame)(frame.as_ptr(), self.as_ptr()),
                 self.api,
             )

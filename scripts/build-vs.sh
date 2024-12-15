@@ -3,9 +3,9 @@
 set -euxo pipefail
 
 export PREFIX="$PWD/vapoursynth/build"
-export VAPOURSYNTH_LIB_PATH="$PREFIX/lib"
+export LIB_PATH="$PREFIX/lib"
 
-if [ ! -f "$VAPOURSYNTH_LIB_PATH/libvapoursynth.so" ]; then
+if [ ! -f "$LIB_PATH/libvapoursynth.so" ]; then
     rm -rf vapoursynth && git clone --depth 1 --branch R70 https://github.com/vapoursynth/vapoursynth
 
     if [ "$RUNNER_OS" == "macOS" ]; then
@@ -14,7 +14,7 @@ if [ ! -f "$VAPOURSYNTH_LIB_PATH/libvapoursynth.so" ]; then
 
     pushd vapoursynth
 
-    if [ ! -f "$VAPOURSYNTH_LIB_PATH/libzimg.a" ]; then
+    if [ ! -f "$LIB_PATH/libzimg.a" ]; then
         git clone --depth 1 --branch release-3.0.5 https://github.com/sekrit-twc/zimg
         pushd zimg
         ./autogen.sh
@@ -26,7 +26,7 @@ if [ ! -f "$VAPOURSYNTH_LIB_PATH/libvapoursynth.so" ]; then
 
     pip install Cython
 
-    export PKG_CONFIG_PATH="$VAPOURSYNTH_LIB_PATH/pkgconfig"
+    export PKG_CONFIG_PATH="$LIB_PATH/pkgconfig"
     ./autogen.sh
     ./configure CFLAGS="-g -O0 -w" --prefix="$PREFIX"
     make -j"$(nproc)"
@@ -34,6 +34,6 @@ if [ ! -f "$VAPOURSYNTH_LIB_PATH/libvapoursynth.so" ]; then
     popd
 fi
 
-echo "VAPOURSYNTH_LIB_PATH=${VAPOURSYNTH_LIB_PATH}" >> $GITHUB_ENV
-echo "LD_LIBRARY_PATH=${VAPOURSYNTH_LIB_PATH}" >> $GITHUB_ENV
-echo "DYLD_LIBRARY_PATH=${VAPOURSYNTH_LIB_PATH}" >> $GITHUB_ENV
+echo "VAPOURSYNTH_LIB_PATH=${LIB_PATH}" >> $GITHUB_ENV
+echo "LD_LIBRARY_PATH=${LIB_PATH}" >> $GITHUB_ENV
+echo "DYLD_LIBRARY_PATH=${LIB_PATH}" >> $GITHUB_ENV
