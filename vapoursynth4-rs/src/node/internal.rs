@@ -2,16 +2,10 @@ use std::{
     ffi::{c_int, c_void},
     mem::ManuallyDrop,
     panic::AssertUnwindSafe,
-    ptr::null,
+    ptr::null_mut,
 };
 
-use crate::{
-    api::Api,
-    core::CoreRef,
-    frame::{Frame, FrameContext},
-    map::MapRef,
-    utils::ToCString,
-};
+use crate::{api::Api, core::CoreRef, frame::FrameContext, map::MapRef, utils::ToCString};
 
 use super::{ffi, Filter};
 
@@ -24,27 +18,27 @@ pub trait FilterExtern: Filter {
         vsapi: *const ffi::VSAPI,
     ) {
         let api = Api::from_ptr(vsapi);
+        let output = MapRef::from_ptr(out, api);
 
         let input = MapRef::from_ptr(in_, api);
-        let mut output = MapRef::from_ptr(out, api);
         let core = CoreRef::from_ptr(core, api);
         let data = if user_data.is_null() {
             None
         } else {
-            Some(Box::from_raw(user_data.cast()))
+            Some(&*user_data.cast())
         };
 
-        match std::panic::catch_unwind(AssertUnwindSafe(|| Self::create(input, output, data, core)))
-        {
-            Ok(Err(e)) => {
+        let _ = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            std::panic::set_hook({
+                Box::new(move |p| {
+                    let e = format!("panic: {p}");
+                    output.set_error(&e.into_cstring_lossy());
+                })
+            });
+            if let Err(e) = Self::create(input, output, data, core) {
                 output.set_error(e.as_ref());
             }
-            Err(p) => {
-                let e = p.downcast::<&str>().unwrap_unchecked();
-                output.set_error(&e.into_cstring_lossy());
-            }
-            _ => {}
-        }
+        }));
     }
 
     unsafe extern "system-unwind" fn filter_get_frame(
@@ -57,30 +51,37 @@ pub trait FilterExtern: Filter {
         vsapi: *const ffi::VSAPI,
     ) -> *const ffi::VSFrame {
         let api = Api::from_ptr(vsapi);
+        let ctx = FrameContext::from_ptr(frame_ctx, api);
+
         let filter = instance_data.cast::<Self>().as_mut().unwrap_unchecked();
-        let mut ctx = AssertUnwindSafe(FrameContext::from_ptr(frame_ctx, api));
         let core = CoreRef::from_ptr(core, api);
+        let frame_data = &mut *frame_data.cast();
 
-        let frame = std::panic::catch_unwind(|| {
-            filter.get_frame(n, activation_reason, frame_data, *ctx, core)
-        });
-        match frame {
-            Ok(Ok(Some(frame))) => {
-                // Transfer the ownership to VapourSynth
-                let frame = ManuallyDrop::new(frame);
-                return frame.as_ptr();
-            }
-            Ok(Err(e)) => {
-                ctx.set_filter_error(e.as_ref());
-            }
-            Err(p) => {
-                let e = p.downcast::<&str>().unwrap_unchecked();
-                ctx.set_filter_error(&e.into_cstring_lossy());
-            }
-            _ => {}
-        }
+        let res = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            std::panic::set_hook({
+                Box::new(move |p| {
+                    let e = format!("panic: {p}");
+                    ctx.set_filter_error(&e.into_cstring_lossy());
+                })
+            });
 
-        null()
+            let frame = filter.get_frame(n, activation_reason, frame_data, ctx, core);
+            match frame {
+                Ok(Some(frame)) => {
+                    // Transfer the ownership to VapourSynth
+                    let frame = ManuallyDrop::new(frame);
+                    return frame.as_ptr();
+                }
+                Err(e) => {
+                    ctx.set_filter_error(e.as_ref());
+                }
+                _ => {}
+            }
+
+            null_mut()
+        }));
+
+        res.unwrap_or(null_mut())
     }
 
     unsafe extern "system-unwind" fn filter_free(
