@@ -141,7 +141,7 @@ macro_rules! declare_plugin {
             );
 
             $(
-                $crate::node::FilterRegister::<$filter>::new($data).register(plugin, vspapi);
+                $crate::node::FilterRegister::<$filter>::new($data).register(plugin, vspapi).unwrap();
             )*
         }
     };

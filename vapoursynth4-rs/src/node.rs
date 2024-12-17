@@ -17,7 +17,7 @@ use crate::{
     api::Api,
     core::Core,
     ffi,
-    frame::{internal::FrameFromPtr, AudioFrame, Frame, FrameContext, VideoFrame},
+    frame::{Frame, FrameContext, FrameType, FrameTypeAudio, FrameTypeVideo, VideoFrame},
     node::internal::FilterExtern,
     AudioInfo, VideoInfo,
 };
@@ -25,101 +25,109 @@ use crate::{
 pub use dependency::*;
 pub use filter::*;
 
-pub trait Node: Sized + crate::_private::Sealed {
-    type FrameType: Frame;
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct Node<T: FrameType> {
+    handle: NonNull<ffi::VSNode>,
+    api: Api,
+    frame: std::marker::PhantomData<T>,
+}
 
-    #[doc(hidden)]
-    fn api(&self) -> Api;
-
+impl<T: FrameType> Node<T> {
     #[must_use]
-    fn as_ptr(&self) -> *mut ffi::VSNode;
-
-    #[must_use]
-    fn get_frame_filter(&self, n: i32, ctx: &mut FrameContext) -> Self::FrameType;
-
-    fn set_linear_filter(&mut self) -> i32 {
-        unsafe { (self.api().setLinearFilter)(self.as_ptr()) }
+    #[inline]
+    pub fn as_ptr(&self) -> *mut ffi::VSNode {
+        self.handle.as_ptr()
     }
 
-    fn set_cache_mode(&mut self, mode: CacheMode) {
-        unsafe {
-            (self.api().setCacheMode)(self.as_ptr(), mode);
+    #[must_use]
+    #[inline]
+    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSNode, api: Api) -> Self {
+        Self {
+            handle: NonNull::new_unchecked(ptr),
+            api,
+            frame: std::marker::PhantomData,
         }
     }
 
-    fn set_cache_options(&mut self, fixed_size: i32, max_size: i32, max_history_size: i32) {
+    #[inline]
+    #[must_use]
+    pub fn set_linear_filter(&self) -> i32 {
+        unsafe { (self.api.setLinearFilter)(self.as_ptr()) }
+    }
+
+    #[inline]
+    pub fn set_cache_mode(&self, mode: CacheMode) {
         unsafe {
-            (self.api().setCacheOptions)(self.as_ptr(), fixed_size, max_size, max_history_size);
+            (self.api.setCacheMode)(self.as_ptr(), mode);
+        }
+    }
+
+    #[inline]
+    pub fn set_cache_options(&self, fixed_size: i32, max_size: i32, max_history_size: i32) {
+        unsafe {
+            (self.api.setCacheOptions)(self.as_ptr(), fixed_size, max_size, max_history_size);
         }
     }
 
     /// # Errors
     ///
     /// Return the internal error message if the frame is not ready.
-    fn get_frame(&self, n: i32) -> Result<Self::FrameType, CString> {
-        let mut buf = vec![0; 1024];
-        let ptr = unsafe { (self.api().getFrame)(n, self.as_ptr(), buf.as_mut_ptr(), 1024) };
+    pub fn get_frame(&self, n: i32) -> Result<Frame<T>, CString> {
+        const LEN: i32 = 1024 * 10;
+        let mut buf = vec![0; LEN as _];
+        let ptr = unsafe { (self.api.getFrame)(n, self.as_ptr(), buf.as_mut_ptr(), LEN) };
 
         if ptr.is_null() {
             let mut buf = std::mem::ManuallyDrop::new(buf);
             Err(unsafe { CStr::from_ptr(buf.as_mut_ptr()).into() })
         } else {
-            unsafe { Ok(Self::FrameType::from_ptr(ptr, self.api())) }
+            unsafe { Ok(Frame::<T>::from_ptr(ptr, self.api)) }
         }
     }
 
-    // TODO: Find a better way to handle callbacks
-    fn get_frame_async<D, F, Fr>(&self, _n: i32, _data: &mut D)
-    where
-        F: Fn(D, Fr, i32) -> Result<(), String>,
-        Fr: Frame,
-    {
-        todo!()
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct VideoNode {
-    handle: NonNull<ffi::VSNode>,
-    api: Api,
-}
-
-impl crate::_private::Sealed for VideoNode {}
-impl Node for VideoNode {
-    type FrameType = VideoFrame;
-
-    #[inline]
-    fn api(&self) -> Api {
-        self.api
-    }
+    // TODO: get_frame_async
 
     #[must_use]
     #[inline]
-    fn as_ptr(&self) -> *mut ffi::VSNode {
-        self.handle.as_ptr()
-    }
-
-    #[must_use]
-    fn get_frame_filter(&self, n: i32, ctx: &mut FrameContext) -> Self::FrameType {
+    pub fn get_frame_filter(&self, n: i32, ctx: &FrameContext) -> VideoFrame {
         unsafe {
             VideoFrame::from_ptr(
-                (self.api.getFrameFilter)(n, self.as_ptr(), ctx.as_mut_ptr()),
+                (self.api.getFrameFilter)(n, self.as_ptr(), ctx.as_ptr()),
                 self.api,
             )
         }
     }
-}
 
-impl VideoNode {
-    #[must_use]
-    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSNode, api: Api) -> Self {
-        Self {
-            handle: NonNull::new_unchecked(ptr),
-            api,
+    #[inline]
+    pub fn request_frame_filter(&self, n: i32, ctx: &FrameContext) {
+        unsafe {
+            (self.api.requestFrameFilter)(n, self.as_ptr(), ctx.as_ptr());
         }
     }
 
+    #[inline]
+    pub fn release_frame_early(&self, n: i32, ctx: &FrameContext) {
+        unsafe {
+            (self.api.releaseFrameEarly)(self.as_ptr(), n, ctx.as_ptr());
+        }
+    }
+}
+
+impl<T: FrameType> Clone for Node<T> {
+    fn clone(&self) -> Self {
+        unsafe { Self::from_ptr((self.api.addNodeRef)(self.as_ptr()), self.api) }
+    }
+}
+
+impl<T: FrameType> Drop for Node<T> {
+    fn drop(&mut self) {
+        unsafe { (self.api.freeNode)(self.as_ptr()) }
+    }
+}
+
+impl Node<FrameTypeVideo> {
     #[must_use]
+    #[inline]
     pub fn info(&self) -> &VideoInfo {
         // SAFETY: `vi` is valid if the node is a video node
         unsafe { &*(self.api.getVideoInfo)(self.as_ptr()) }
@@ -151,68 +159,20 @@ impl VideoNode {
                 core.as_ptr(),
             )
         };
+
         NonNull::new(ptr).map(|handle| Self {
             handle,
             api: core.api(),
+            frame: std::marker::PhantomData,
         })
     }
 }
 
-impl Clone for VideoNode {
-    fn clone(&self) -> Self {
-        unsafe { Self::from_ptr((self.api.addNodeRef)(self.as_ptr()), self.api) }
-    }
-}
-
-impl Drop for VideoNode {
-    fn drop(&mut self) {
-        unsafe { (self.api.freeNode)(self.as_ptr()) }
-    }
-}
-
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub struct AudioNode {
-    handle: NonNull<ffi::VSNode>,
-    api: Api,
-}
-
-impl crate::_private::Sealed for AudioNode {}
-impl Node for AudioNode {
-    type FrameType = AudioFrame;
-
-    #[inline]
-    fn api(&self) -> Api {
-        self.api
-    }
-
+impl Node<FrameTypeAudio> {
     #[must_use]
     #[inline]
-    fn as_ptr(&self) -> *mut ffi::VSNode {
-        self.handle.as_ptr()
-    }
-
-    fn get_frame_filter(&self, n: i32, ctx: &mut FrameContext) -> Self::FrameType {
-        unsafe {
-            AudioFrame::from_ptr(
-                (self.api.getFrameFilter)(n, self.as_ptr(), ctx.as_mut_ptr()),
-                self.api,
-            )
-        }
-    }
-}
-
-impl AudioNode {
-    #[must_use]
-    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSNode, api: Api) -> Self {
-        Self {
-            handle: NonNull::new_unchecked(ptr),
-            api,
-        }
-    }
-
-    #[must_use]
     pub fn info(&self) -> &AudioInfo {
-        // SAFETY: `ai` is valid if the node is an audio node
+        // SAFETY: `vi` is valid if the node is a video node
         unsafe { &*(self.api.getAudioInfo)(self.as_ptr()) }
     }
 
@@ -245,21 +205,13 @@ impl AudioNode {
         NonNull::new(ptr).map(|handle| Self {
             handle,
             api: core.api(),
+            frame: std::marker::PhantomData,
         })
-    }
-}
-
-impl Clone for AudioNode {
-    fn clone(&self) -> Self {
-        unsafe { Self::from_ptr((self.api.addNodeRef)(self.as_ptr()), self.api) }
-    }
-}
-
-impl Drop for AudioNode {
-    fn drop(&mut self) {
-        unsafe { (self.api.freeNode)(self.as_ptr()) }
     }
 }
 
 pub type FilterMode = ffi::VSFilterMode;
 pub type CacheMode = ffi::VSCacheMode;
+
+pub type VideoNode = Node<FrameTypeVideo>;
+pub type AudioNode = Node<FrameTypeVideo>;
