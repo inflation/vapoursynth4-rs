@@ -276,8 +276,7 @@ impl Core {
     #[must_use]
     pub fn get_video_format_name(&self, format: &VideoFormat) -> Option<String> {
         let mut buffer = FormatName::new();
-        if 0 == unsafe { (self.api.getVideoFormatName)(format, buffer.buffer.as_mut_ptr().cast()) }
-        {
+        if 0 == unsafe { (self.api.getVideoFormatName)(format, buffer.as_mut_ptr().cast()) } {
             None
         } else {
             Some(buffer.to_string())
@@ -307,8 +306,7 @@ impl Core {
     #[must_use]
     pub fn get_audio_format_name(&self, format: &AudioFormat) -> Option<String> {
         let mut buffer = FormatName::new();
-        if 0 == unsafe { (self.api.getAudioFormatName)(format, buffer.buffer.as_mut_ptr().cast()) }
-        {
+        if 0 == unsafe { (self.api.getAudioFormatName)(format, buffer.as_mut_ptr().cast()) } {
             None
         } else {
             Some(buffer.to_string())

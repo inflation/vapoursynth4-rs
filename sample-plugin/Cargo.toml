@@ -9,4 +9,10 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-vapoursynth4-rs = { version = "0.3.0", path = "../vapoursynth4-rs"}
+vapoursynth4-rs = { version = "0.3.0", path = "../vapoursynth4-rs", features = [
+  "link-library", # for tests
+] }
+
+
+[dev-dependencies]
+testresult = "0.4.1"
