@@ -2,4 +2,5 @@
 vapoursynth/
 .vscode/
 .cargo/
+.idea/
 Cargo.lock

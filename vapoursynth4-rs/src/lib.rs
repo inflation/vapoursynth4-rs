@@ -18,6 +18,7 @@ pub mod function;
 pub mod map;
 pub mod node;
 pub mod plugin;
+pub mod sciprt;
 pub mod utils;
 
 pub use vapoursynth4_sys as ffi;

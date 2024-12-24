@@ -60,6 +60,51 @@ impl Default for Api {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct VssApi(*const ffi::VSSCRIPTAPI);
+
+impl VssApi {
+    /// Creates a new `VssApi` instance with the specified major and minor version.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ApiNotFound` if the requested API version is not supported by the linked `VapourSynth` library.
+    #[cfg(feature = "link-library")]
+    pub fn new(major: u16, minor: u16) -> Result<Self, ApiNotFound> {
+        let ptr = unsafe { ffi::getVSScriptAPI(vs_make_version(major, minor)) };
+        (!ptr.is_null())
+            .then_some(Self(ptr))
+            .ok_or(ApiNotFound { major, minor })
+    }
+
+    #[allow(unused)]
+    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSSCRIPTAPI) -> Self {
+        Self(ptr.cast_mut())
+    }
+}
+
+impl Deref for VssApi {
+    type Target = ffi::VSSCRIPTAPI;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.0 }
+    }
+}
+
+#[cfg(feature = "link-library")]
+impl Default for VssApi {
+    /// Creates a new `Api` instance with the default version.
+    ///
+    /// # Panics
+    ///
+    /// Internal error indicates that something went wrong with the linked `VapourSynth` library.
+    #[must_use]
+    fn default() -> Self {
+        Self::new(ffi::VSSCRIPT_API_MAJOR, ffi::VSSCRIPT_API_MINOR).unwrap()
+    }
+}
+
 pub mod error {
     use thiserror::Error;
 

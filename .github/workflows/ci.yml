@@ -1,6 +1,6 @@
 name: CI
 
-on: 
+on:
   push:
     branches:
       - master
@@ -27,17 +27,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-      - name: Dependency
-        run: cargo fetch
-      - uses: actions/cache@v4
-        id: cache
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            target/
-            vapoursynth/build/
-            vapoursynth/msvc_project/x64/Debug/
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-      - name: Set scipt path
+          cache-directories: |
+            vapoursynth/
+      - name: Set script path
         id: build-scripts
         shell: bash
         run: |
@@ -46,13 +41,23 @@ jobs:
           else
             echo "BUILD_SCRIPT=scripts/build-vs.sh" >> "$GITHUB_OUTPUT"
           fi
-      - name: Setup msbuild (Windows)
+      - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
+        if: matrix.os == 'windows-latest'
+      - name: Install winget
+        uses: Cyberboss/install-winget@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: matrix.os == 'windows-latest'
+      - name: Install VapourSynth
+        run: winget install vapoursynth --disable-interactivity --accept-source-agreements --accept-package-agreements
         if: matrix.os == 'windows-latest'
       - name: Build VapourSynth in debug mode
         run: ${{ steps.build-scripts.outputs.BUILD_SCRIPT }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
+      - name: Build
+        run: cargo build --all-features --workspace
       - name: Tests
         run: cargo nextest run --all-features --workspace
 
@@ -66,27 +71,24 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: llvm-tools
-      - name: Dependency
-        run: cargo fetch
-      - uses: actions/cache@v4
-        id: cache
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            target/
-            vapoursynth/build/
-          key: ${{ runner.os }}-cargo-cov-${{ hashFiles('**/Cargo.lock') }}
+          cache-directories: |
+            vapoursynth/
       - name: Build VapourSynth in debug mode
         run: scripts/build-vs.sh
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
+      - name: Build
+        run: cargo +nightly build --all-features --workspace
       - name: Generate code coverage
-        run: 
-          cargo +nightly llvm-cov nextest
-            --all-features --workspace
-            --ignore-filename-regex vapoursynth4-sys/
-            --lcov --output-path lcov.info
+        run: cargo +nightly llvm-cov nextest
+          --all-features --workspace
+          --ignore-filename-regex vapoursynth4-sys/
+          --lcov --output-path lcov.info
         env:
           VAPOURSYNTH_LIB_PATH: vapoursynth/build/lib
       - name: Upload coverage to Codecov
@@ -106,23 +108,21 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
-      - name: Dependency
-        run: cargo fetch
-      - uses: actions/cache@v4
-        id: cache
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            target/
-            vapoursynth/build/
-          key: ${{ runner.os }}-cargo-sanitizer-${{ hashFiles('**/Cargo.lock') }}
+          cache-directories: |
+            vapoursynth/
       - name: Build VapourSynth in debug mode
         run: scripts/build-vs.sh
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
+      - name: Build
+        run: cargo build --all-features --workspace
       - name: Address Sanitizer
-        run: 
-          cargo +nightly nextest run
-            -Z build-std --target=x86_64-unknown-linux-gnu --all-features
+        run:
+          cargo +nightly nextest run -Z build-std --target=x86_64-unknown-linux-gnu --all-features
+          -p vapoursynth4-sys -p vapoursynth4-rs
         env:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
@@ -138,14 +138,6 @@ jobs:
           submodules: recursive
       - name: Install Rust
         run: rustup update stable
-      - name: Dependency
-        run: cargo fetch
-      - uses: actions/cache@v4
-        id: cache
-        with:
-          path: |
-            target/
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
       - name: Run Clippy with reviewdog
         uses: giraffate/clippy-action@v1.0.1
         with:

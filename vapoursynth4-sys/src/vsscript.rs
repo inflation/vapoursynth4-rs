@@ -168,11 +168,8 @@ pub struct VSSCRIPTAPI {
     /// * `vars` - Map containing the variables to set.
     ///
     /// Returns non-zero on error.
-    pub setVariable: unsafe extern "system-unwind" fn(
-        handle: *mut VSScript,
-        name: *const c_char,
-        value: *const c_char,
-    ) -> c_int,
+    pub setVariable:
+        unsafe extern "system-unwind" fn(handle: *mut VSScript, vars: *const VSMap) -> c_int,
 
     /// Retrieves a node from the script environment. A node in the script must have been
     /// marked for output with the requested `index`.
@@ -228,6 +225,8 @@ pub struct VSSCRIPTAPI {
     ) -> c_int,
 }
 
+#[cfg_attr(target_os = "windows", link(name = "VSScript"))]
+#[cfg_attr(not(target_os = "windows"), link(name = "vapoursynth-script"))]
 extern "system-unwind" {
     /// Returns a struct containing function pointer for the api.
     /// Will return `NULL` is the specified version isn’t supported.

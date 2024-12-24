@@ -17,16 +17,5 @@ fn main() {
         if let Ok(dir) = env::var(LIBRARY_DIR_VARIABLE) {
             println!("cargo:rustc-link-search=native={dir}");
         }
-
-        // Handle linking to VapourSynth libs.
-        println!("cargo:rustc-link-lib=vapoursynth");
-
-        #[cfg(feature = "vsscript")]
-        {
-            #[cfg(not(target_os = "windows"))]
-            println!("cargo:rustc-link-lib=vapoursynth-script");
-            #[cfg(target_os = "windows")]
-            println!("cargo:rustc-link-lib=VSScript");
-        }
     }
 }

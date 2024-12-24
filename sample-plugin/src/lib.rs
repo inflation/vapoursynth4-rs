@@ -135,3 +135,21 @@ declare_plugin!(
     (DumbFilter, None),
     (DitherFilter, None)
 );
+
+#[cfg(test)]
+mod tests {
+    use testresult::TestResult;
+    use vapoursynth4_rs::sciprt::Script;
+
+    #[test]
+    fn test_vsscript_works() -> TestResult {
+        let vss = Script::default();
+        vss.evaluate_file(c"test.vpy")?;
+        let node = vss.get_output(0)?;
+        unsafe {
+            (vss.get_api().freeNode)(node);
+        }
+
+        Ok(())
+    }
+}

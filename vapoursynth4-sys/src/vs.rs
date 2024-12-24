@@ -2209,6 +2209,7 @@ pub struct VSAPI {
         unsafe extern "system-unwind" fn(node: *mut VSNode, level: c_int) -> *const VSMap,
 }
 
+#[link(name = "vapoursynth")]
 extern "system-unwind" {
     /// Returns a pointer to the global [`VSAPI`] instance.
     ///
