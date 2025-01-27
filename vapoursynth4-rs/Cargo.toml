@@ -17,7 +17,7 @@ vapoursynth4-sys = { version = "0.3.0", path = "../vapoursynth4-sys"}
 # vapoursynth4-rs-macros = { version = "0.1.0", path = "../vapoursynth4-rs-macros", optional = true}
 
 [dev-dependencies]
-const-str = "0.5.6"
+const-str = "0.6.0"
 testresult = "0.4.0"
 
 [features]
