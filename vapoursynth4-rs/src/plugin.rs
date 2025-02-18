@@ -1,12 +1,16 @@
+/*
+ This Source Code Form is subject to the terms of the Mozilla Public
+ License, v. 2.0. If a copy of the MPL was not distributed with this
+ file, You can obtain one at http://mozilla.org/MPL/2.0/.
+*/
+
 pub mod plugin_function;
-pub mod types;
 
 use std::{borrow::Borrow, ffi::CStr, ptr::NonNull};
 
 use crate::{api::Api, core::Core, ffi, map::Map};
 
 pub use plugin_function::*;
-pub use types::*;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Plugin {
@@ -141,7 +145,7 @@ macro_rules! declare_plugin {
             );
 
             $(
-                $crate::node::FilterRegister::<$filter>::new($data).register(plugin, vspapi);
+                $crate::node::FilterRegister::<$filter>::new($data).register(plugin, vspapi).unwrap();
             )*
         }
     };

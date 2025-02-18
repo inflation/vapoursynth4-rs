@@ -23,10 +23,6 @@ pub mod utils;
 
 pub use vapoursynth4_sys as ffi;
 
-mod _private {
-    pub trait Sealed {}
-}
-
 pub type ColorFamily = ffi::VSColorFamily;
 pub type SampleType = ffi::VSSampleType;
 

@@ -41,4 +41,4 @@ list=("$LIB_PATH"/python*/site-packages)
     echo "LD_LIBRARY_PATH=${LIB_PATH}"
     echo "DYLD_LIBRARY_PATH=${LIB_PATH}"
     echo "PYTHONPATH=${list[0]}"
-} >> "$GITHUB_ENV"
+} >>"$GITHUB_ENV"

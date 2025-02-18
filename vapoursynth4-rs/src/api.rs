@@ -16,7 +16,7 @@ use self::error::ApiNotFound;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct Api(*const ffi::VSAPI);
+pub struct Api(pub(crate) *const ffi::VSAPI);
 
 impl Api {
     /// Creates a new `Api` instance with the specified major and minor version.
@@ -27,15 +27,9 @@ impl Api {
     #[cfg(feature = "link-library")]
     pub fn new(major: u16, minor: u16) -> Result<Self, ApiNotFound> {
         let ptr = unsafe { ffi::getVapourSynthAPI(vs_make_version(major, minor)) };
-        if ptr.is_null() {
-            Err(ApiNotFound { major, minor })
-        } else {
-            Ok(Self(ptr))
-        }
-    }
-
-    pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSAPI) -> Self {
-        Self(ptr)
+        (!ptr.is_null())
+            .then_some(Self(ptr))
+            .ok_or(ApiNotFound { major, minor })
     }
 }
 
@@ -56,7 +50,8 @@ impl Default for Api {
     /// Internal error indicates that something went wrong with the linked `VapourSynth` library.
     #[must_use]
     fn default() -> Self {
-        Self::new(ffi::VAPOURSYNTH_API_MAJOR, ffi::VAPOURSYNTH_API_MINOR).unwrap()
+        Self::new(ffi::VAPOURSYNTH_API_MAJOR, ffi::VAPOURSYNTH_API_MINOR)
+            .expect("Failed to get VSAPI. Please check if the dynamic library is linked correctly")
     }
 }
 
@@ -101,7 +96,8 @@ impl Default for VssApi {
     /// Internal error indicates that something went wrong with the linked `VapourSynth` library.
     #[must_use]
     fn default() -> Self {
-        Self::new(ffi::VSSCRIPT_API_MAJOR, ffi::VSSCRIPT_API_MINOR).unwrap()
+        Self::new(ffi::VSSCRIPT_API_MAJOR, ffi::VSSCRIPT_API_MINOR).expect("Failed to get VSSCRIPTAPI. 
+        Please check if the dynamic library is linked correctly and the proper Python environment is selected")
     }
 }
 
