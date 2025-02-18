@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.3.0...vapoursynth4-sys-v0.3.1)
+
+### 🧪 Testing
+
+- Test plugin with library - ([15ffab3](https://github.com/inflation/vapoursynth4-rs/commit/15ffab39e967ad298211425c27d567feec92884b))
+
 ## [0.3.0](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.2.0...vapoursynth4-sys-v0.3.0)
 
 ### ⛰️ Features
