@@ -1,16 +1,18 @@
 import platform
+
 from vapoursynth import core
 
-if platform.system() == "Windows":
-    path = r"../target/debug/sample_plugin.dll"
-elif platform.system() == "Linux":
-    path = r"../target/debug/libsample_plugin.so"
-else:
-    path = r"../target/debug/libsample_plugin.dylib"
+match platform.system():
+    case "Windows":
+        path=r"../target/debug/sample_plugin.dll"
+    case "Linux":
+        path=r"../target/debug/libsample_plugin.so"
+    case "Darwin":
+        path=r"../target/debug/libsample_plugin.dylib"
 
 core.std.LoadPlugin(path)
 
 clip = core.std.BlankClip()
-clip = core.invert.Filter(clip, enabled=True)
+clip = core.sample.Splice([clip, clip])
 
 clip.set_output()

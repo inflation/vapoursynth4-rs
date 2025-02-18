@@ -18,9 +18,7 @@ use core_builder::State;
 use crate::{
     api::Api,
     ffi,
-    frame::{
-        internal::FrameFromPtr, AudioFormat, AudioFrame, FormatName, Frame, VideoFormat, VideoFrame,
-    },
+    frame::{AudioFormat, AudioFrame, Frame, FrameType, VideoFormat, VideoFrame},
     function::Function,
     map::{Map, MapRef},
     node::{internal::FilterExtern, Dependencies, Filter},
@@ -46,22 +44,22 @@ impl CoreRef<'_> {
     }
 }
 
-impl AsRef<Core> for CoreRef<'_> {
-    fn as_ref(&self) -> &Core {
+impl<'c> AsRef<Core> for CoreRef<'c> {
+    fn as_ref(&self) -> &'c Core {
         unsafe { &*std::ptr::from_ref(self).cast() }
     }
 }
 
-impl Deref for CoreRef<'_> {
+impl<'c> Deref for CoreRef<'c> {
     type Target = Core;
 
-    fn deref(&self) -> &Self::Target {
+    fn deref(&self) -> &'c Self::Target {
         unsafe { &*std::ptr::from_ref(self).cast() }
     }
 }
 
-impl DerefMut for CoreRef<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
+impl<'c> DerefMut for CoreRef<'c> {
+    fn deref_mut(&mut self) -> &'c mut Self::Target {
         unsafe { &mut *std::ptr::from_mut(self).cast() }
     }
 }
@@ -103,7 +101,7 @@ impl Core {
     ///
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_video_filter<F: Filter>(
-        &mut self,
+        &self,
         out: MapRef,
         name: &CStr,
         info: &VideoInfo,
@@ -131,8 +129,8 @@ impl Core {
     ///
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_audio_filter<F: Filter>(
-        &mut self,
-        out: &mut MapRef,
+        &self,
+        out: &MapRef,
         name: &CStr,
         info: &AudioInfo,
         filter: F,
@@ -171,7 +169,7 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
                 self.as_ptr(),
             );
-            VideoFrame::from_ptr(ptr, self.api)
+            Frame::from_ptr(ptr, self.api)
         }
     }
 
@@ -240,9 +238,9 @@ impl Core {
     }
 
     #[must_use]
-    pub fn copy_frame<F: Frame>(&self, frame: &F) -> F {
+    pub fn copy_frame<F: FrameType>(&self, frame: &Frame<F>) -> Frame<F> {
         unsafe {
-            F::from_ptr(
+            Frame::<F>::from_ptr(
                 (self.api.copyFrame)(frame.as_ptr(), self.as_ptr()),
                 self.api,
             )
@@ -274,16 +272,6 @@ impl Core {
     }
 
     #[must_use]
-    pub fn get_video_format_name(&self, format: &VideoFormat) -> Option<String> {
-        let mut buffer = FormatName::new();
-        if 0 == unsafe { (self.api.getVideoFormatName)(format, buffer.as_mut_ptr().cast()) } {
-            None
-        } else {
-            Some(buffer.to_string())
-        }
-    }
-
-    #[must_use]
     pub fn query_audio_format(
         &self,
         sample_type: SampleType,
@@ -300,16 +288,6 @@ impl Core {
                 self.as_ptr(),
             );
             format.assume_init()
-        }
-    }
-
-    #[must_use]
-    pub fn get_audio_format_name(&self, format: &AudioFormat) -> Option<String> {
-        let mut buffer = FormatName::new();
-        if 0 == unsafe { (self.api.getAudioFormatName)(format, buffer.as_mut_ptr().cast()) } {
-            None
-        } else {
-            Some(buffer.to_string())
         }
     }
 

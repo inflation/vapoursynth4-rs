@@ -1,5 +1,11 @@
+/*
+ This Source Code Form is subject to the terms of the Mozilla Public
+ License, v. 2.0. If a copy of the MPL was not distributed with this
+ file, You can obtain one at http://mozilla.org/MPL/2.0/.
+*/
+
 use std::{
-    ffi::{c_char, CStr, CString},
+    ffi::{c_char, CStr},
     fmt::{Debug, Display},
     ops::Deref,
     ptr,
@@ -7,67 +13,13 @@ use std::{
 
 use thiserror::Error;
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-#[repr(transparent)]
-pub struct Key {
-    inner: CString,
-}
-
-impl Key {
-    /// # Errors
-    ///
-    /// Return [`InvalidKey`] if the key contains characters that are not alphanumeric
-    /// or underscore
-    pub fn new<T>(val: T) -> Result<Self, InvalidKey>
-    where
-        T: Into<Vec<u8>>,
-    {
-        let mut val: Vec<u8> = val.into();
-        if let Some(i) = val.iter().position(|&c| c == 0) {
-            val.drain(i..);
-        }
-        if val.iter().all(|&c| c.is_ascii_alphanumeric() || c == b'_') {
-            val.push(0);
-            Ok(Self {
-                inner: unsafe { CString::from_vec_with_nul_unchecked(val) },
-            })
-        } else {
-            Err(InvalidKey)
-        }
-    }
-}
-
-impl Deref for Key {
-    type Target = KeyStr;
-
-    fn deref(&self) -> &Self::Target {
-        // SAFETY: Key is validated
-        unsafe { KeyStr::from_cstr_unchecked(self.inner.as_c_str()) }
-    }
-}
-
-impl From<&KeyStr> for Key {
-    fn from(value: &KeyStr) -> Self {
-        Self {
-            inner: value.inner.into(),
-        }
-    }
-}
-
-impl Display for Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // SAFETY: Key is validated
-        unsafe { f.write_str(std::str::from_utf8_unchecked(self.inner.as_bytes())) }
-    }
-}
-
 #[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[repr(transparent)]
-pub struct KeyStr {
+pub struct Key {
     inner: CStr,
 }
 
-impl KeyStr {
+impl Key {
     #[must_use]
     pub const fn from_cstr(str: &CStr) -> &Self {
         let mut i = 0;
@@ -83,11 +35,8 @@ impl KeyStr {
         unsafe { Self::from_cstr_unchecked(str) }
     }
 
-    #[must_use]
-    /// # Safety
-    /// The caller must ensure that the key is valid to contain only characters that are alphanumeric or underscore
-    pub const unsafe fn from_cstr_unchecked(str: &CStr) -> &Self {
-        &*(ptr::from_ref(str) as *const KeyStr)
+    const unsafe fn from_cstr_unchecked(str: &CStr) -> &Self {
+        &*(ptr::from_ref(str) as *const Key)
     }
 
     pub(crate) unsafe fn from_ptr<'a>(ptr: *const c_char) -> &'a Self {
@@ -95,7 +44,7 @@ impl KeyStr {
     }
 }
 
-impl Deref for KeyStr {
+impl Deref for Key {
     type Target = CStr;
 
     fn deref(&self) -> &Self::Target {
@@ -103,7 +52,7 @@ impl Deref for KeyStr {
     }
 }
 
-impl Display for KeyStr {
+impl Display for Key {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         unsafe { f.write_str(std::str::from_utf8_unchecked(self.inner.to_bytes())) }
     }
@@ -111,8 +60,12 @@ impl Display for KeyStr {
 
 #[macro_export]
 macro_rules! key {
-    ($s:expr) => {
-        const { $crate::map::KeyStr::from_cstr($s) }
+    ($s:literal) => {
+        const {
+            $crate::map::Key::from_cstr(unsafe {
+                &CStr::from_bytes_with_nul_unchecked(concat!($s, "\0").as_bytes())
+            })
+        }
     };
 }
 

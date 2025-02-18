@@ -1,11 +1,14 @@
+/*
+ This Source Code Form is subject to the terms of the Mozilla Public
+ License, v. 2.0. If a copy of the MPL was not distributed with this
+ file, You can obtain one at http://mozilla.org/MPL/2.0/.
+*/
+
 use std::{ffi::CStr, ptr::NonNull};
 
-use crate::{
-    api::Api,
-    ffi,
-    frame::Frame,
-    node::{Node, VideoNode},
-};
+use crate::{api::Api, ffi, frame::Frame};
+
+use super::FrameType;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct FrameContext {
@@ -23,36 +26,22 @@ impl FrameContext {
     }
 
     #[must_use]
-    pub fn as_ptr(&self) -> *const ffi::VSFrameContext {
+    pub fn as_ptr(&self) -> *mut ffi::VSFrameContext {
         self.handle.as_ptr()
     }
 
-    #[must_use]
-    pub fn as_mut_ptr(&mut self) -> *mut ffi::VSFrameContext {
-        self.handle.as_ptr()
-    }
-
-    pub fn request_frame_filter(&mut self, n: i32, node: &VideoNode) {
+    pub fn cache_frame<T: FrameType>(&self, frame: &Frame<T>, n: i32) {
         unsafe {
-            (self.api.requestFrameFilter)(n, node.as_ptr(), self.as_mut_ptr());
+            (self.api.cacheFrame)(frame.as_ptr(), n, self.as_ptr());
         }
     }
 
-    pub fn release_frame_early(&mut self, n: i32, node: &VideoNode) {
+    pub fn set_filter_error(&self, msg: &CStr) {
         unsafe {
-            (self.api.releaseFrameEarly)(node.as_ptr(), n, self.as_mut_ptr());
-        }
-    }
-
-    pub fn cache_frame(&mut self, frame: &impl Frame, n: i32) {
-        unsafe {
-            (self.api.cacheFrame)(frame.as_ptr(), n, self.as_mut_ptr());
-        }
-    }
-
-    pub fn set_filter_error(&mut self, msg: &CStr) {
-        unsafe {
-            (self.api.setFilterError)(msg.as_ptr().cast(), self.as_mut_ptr());
+            (self.api.setFilterError)(msg.as_ptr().cast(), self.as_ptr());
         }
     }
 }
+
+unsafe impl Sync for FrameContext {}
+unsafe impl Send for FrameContext {}
