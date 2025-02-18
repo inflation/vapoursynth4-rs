@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-rs-v0.3.0...vapoursynth4-rs-v0.3.1)
+
+### 🧪 Testing
+
+- Test plugin with library - ([15ffab3](https://github.com/inflation/vapoursynth4-rs/commit/15ffab39e967ad298211425c27d567feec92884b))
+
+### 📦 Dependencies
+
+- (deps): update const-str requirement from 0.5.6 to 0.6.1 - ([8581831](https://github.com/inflation/vapoursynth4-rs/commit/85818318307a2a5f2540ac3a71d8bf85bb1c6f02))
+
 ## [0.3.0](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-rs-v0.2.0...vapoursynth4-rs-v0.3.0)
 
 ### ⛰️ Features
