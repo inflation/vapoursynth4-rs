@@ -10,7 +10,10 @@
 
 use std::ffi::{c_int, c_void};
 
-use crate::*;
+use crate::{
+    VSAPI, VSAudioFormat, VSAudioInfo, VSColorFamily, VSCore, VSPresetVideoFormat, VSVideoFormat,
+    VSVideoInfo,
+};
 
 /// Convenience function for checking if the format never changes between frames
 #[inline]
@@ -46,14 +49,16 @@ impl VSAPI {
         v: &VSVideoFormat,
         core: *mut VSCore,
     ) -> bool {
-        (self.queryVideoFormatID)(
-            v.color_family,
-            v.sample_type,
-            v.bits_per_sample,
-            v.sub_sampling_w,
-            v.sub_sampling_h,
-            core,
-        ) == preset_format as u32
+        unsafe {
+            (self.queryVideoFormatID)(
+                v.color_family,
+                v.sample_type,
+                v.bits_per_sample,
+                v.sub_sampling_w,
+                v.sub_sampling_h,
+                core,
+            ) == preset_format as u32
+        }
     }
 }
 
@@ -176,15 +181,14 @@ pub unsafe fn bitblt(
     height: usize,
 ) {
     if height != 0 {
-        #[allow(clippy::cast_possible_wrap)]
         if src_stride == dst_stride && src_stride == row_size as isize {
-            dstp.copy_from_nonoverlapping(srcp, row_size * height);
+            unsafe { dstp.copy_from_nonoverlapping(srcp, row_size * height) };
         } else {
             let mut srcp8 = srcp.cast::<u8>();
             let mut dstp8 = dstp.cast::<u8>();
             let mut i = 0;
             while i < height {
-                dstp8.copy_from_nonoverlapping(srcp8, row_size);
+                unsafe { dstp8.copy_from_nonoverlapping(srcp8, row_size) };
                 srcp8 = srcp8.wrapping_offset(src_stride);
                 dstp8 = dstp8.wrapping_offset(dst_stride);
                 i += 1;

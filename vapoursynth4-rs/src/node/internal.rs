@@ -13,7 +13,7 @@ use crate::{
     utils::ToCString,
 };
 
-use super::{ffi, Filter};
+use super::{Filter, ffi};
 
 pub trait FilterExtern: Filter {
     unsafe extern "system-unwind" fn filter_create(
@@ -23,27 +23,30 @@ pub trait FilterExtern: Filter {
         core: *mut ffi::VSCore,
         vsapi: *const ffi::VSAPI,
     ) {
-        let api = Api::from_ptr(vsapi);
+        unsafe {
+            let api = Api::from_ptr(vsapi);
 
-        let input = MapRef::from_ptr(in_, api);
-        let mut output = MapRef::from_ptr(out, api);
-        let core = CoreRef::from_ptr(core, api);
-        let data = if user_data.is_null() {
-            None
-        } else {
-            Some(Box::from_raw(user_data.cast()))
-        };
+            let input = MapRef::from_ptr(in_, api);
+            let mut output = MapRef::from_ptr(out, api);
+            let core = CoreRef::from_ptr(core, api);
+            let data = if user_data.is_null() {
+                None
+            } else {
+                Some(Box::from_raw(user_data.cast()))
+            };
 
-        match std::panic::catch_unwind(AssertUnwindSafe(|| Self::create(input, output, data, core)))
-        {
-            Ok(Err(e)) => {
-                output.set_error(e.as_ref());
+            match std::panic::catch_unwind(AssertUnwindSafe(|| {
+                Self::create(input, output, data, core)
+            })) {
+                Ok(Err(e)) => {
+                    output.set_error(e.as_ref());
+                }
+                Err(p) => {
+                    let e = p.downcast::<&str>().unwrap_unchecked();
+                    output.set_error(&e.into_cstring_lossy());
+                }
+                _ => {}
             }
-            Err(p) => {
-                let e = p.downcast::<&str>().unwrap_unchecked();
-                output.set_error(&e.into_cstring_lossy());
-            }
-            _ => {}
         }
     }
 
@@ -56,28 +59,30 @@ pub trait FilterExtern: Filter {
         core: *mut ffi::VSCore,
         vsapi: *const ffi::VSAPI,
     ) -> *const ffi::VSFrame {
-        let api = Api::from_ptr(vsapi);
-        let filter = instance_data.cast::<Self>().as_mut().unwrap_unchecked();
-        let mut ctx = AssertUnwindSafe(FrameContext::from_ptr(frame_ctx, api));
-        let core = CoreRef::from_ptr(core, api);
+        unsafe {
+            let api = Api::from_ptr(vsapi);
+            let filter = instance_data.cast::<Self>().as_mut().unwrap_unchecked();
+            let mut ctx = AssertUnwindSafe(FrameContext::from_ptr(frame_ctx, api));
+            let core = CoreRef::from_ptr(core, api);
 
-        let frame = std::panic::catch_unwind(|| {
-            filter.get_frame(n, activation_reason, frame_data, *ctx, core)
-        });
-        match frame {
-            Ok(Ok(Some(frame))) => {
-                // Transfer the ownership to VapourSynth
-                let frame = ManuallyDrop::new(frame);
-                return frame.as_ptr();
+            let frame = std::panic::catch_unwind(|| {
+                filter.get_frame(n, activation_reason, frame_data, *ctx, core)
+            });
+            match frame {
+                Ok(Ok(Some(frame))) => {
+                    // Transfer the ownership to VapourSynth
+                    let frame = ManuallyDrop::new(frame);
+                    return frame.as_ptr();
+                }
+                Ok(Err(e)) => {
+                    ctx.set_filter_error(e.as_ref());
+                }
+                Err(p) => {
+                    let e = p.downcast::<&str>().unwrap_unchecked();
+                    ctx.set_filter_error(&e.into_cstring_lossy());
+                }
+                _ => {}
             }
-            Ok(Err(e)) => {
-                ctx.set_filter_error(e.as_ref());
-            }
-            Err(p) => {
-                let e = p.downcast::<&str>().unwrap_unchecked();
-                ctx.set_filter_error(&e.into_cstring_lossy());
-            }
-            _ => {}
         }
 
         null()
@@ -88,11 +93,13 @@ pub trait FilterExtern: Filter {
         core: *mut ffi::VSCore,
         vsapi: *const ffi::VSAPI,
     ) {
-        let api = Api::from_ptr(vsapi);
-        let filter = Box::from_raw(instance_data.cast::<Self>());
-        let core = CoreRef::from_ptr(core, api);
+        unsafe {
+            let api = Api::from_ptr(vsapi);
+            let filter = Box::from_raw(instance_data.cast::<Self>());
+            let core = CoreRef::from_ptr(core, api);
 
-        filter.free(core);
+            filter.free(core);
+        }
     }
 }
 

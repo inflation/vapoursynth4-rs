@@ -8,18 +8,15 @@ mod dependency;
 mod filter;
 pub(crate) mod internal;
 
-use std::{
-    ffi::{CStr, CString},
-    ptr::NonNull,
-};
+use std::ffi::{CStr, CString};
 
 use crate::{
+    AudioInfo, VideoInfo,
     api::Api,
     core::Core,
     ffi,
-    frame::{internal::FrameFromPtr, AudioFrame, Frame, FrameContext, VideoFrame},
+    frame::{AudioFrame, Frame, FrameContext, VideoFrame, internal::FrameFromPtr},
     node::internal::FilterExtern,
-    AudioInfo, VideoInfo,
 };
 
 pub use dependency::*;
@@ -28,7 +25,6 @@ pub use filter::*;
 pub trait Node: Sized + crate::_private::Sealed {
     type FrameType: Frame;
 
-    #[doc(hidden)]
     fn api(&self) -> Api;
 
     #[must_use]
@@ -80,7 +76,7 @@ pub trait Node: Sized + crate::_private::Sealed {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct VideoNode {
-    handle: NonNull<ffi::VSNode>,
+    handle: *const ffi::VSNode,
     api: Api,
 }
 
@@ -96,14 +92,14 @@ impl Node for VideoNode {
     #[must_use]
     #[inline]
     fn as_ptr(&self) -> *mut ffi::VSNode {
-        self.handle.as_ptr()
+        self.handle.cast_mut()
     }
 
     #[must_use]
     fn get_frame_filter(&self, n: i32, ctx: &mut FrameContext) -> Self::FrameType {
         unsafe {
             VideoFrame::from_ptr(
-                (self.api.getFrameFilter)(n, self.as_ptr(), ctx.as_mut_ptr()),
+                (self.api.getFrameFilter)(n, self.as_ptr(), ctx.as_ptr()),
                 self.api,
             )
         }
@@ -113,10 +109,7 @@ impl Node for VideoNode {
 impl VideoNode {
     #[must_use]
     pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSNode, api: Api) -> Self {
-        Self {
-            handle: NonNull::new_unchecked(ptr),
-            api,
-        }
+        Self { handle: ptr, api }
     }
 
     #[must_use]
@@ -151,10 +144,8 @@ impl VideoNode {
                 core.as_ptr(),
             )
         };
-        NonNull::new(ptr).map(|handle| Self {
-            handle,
-            api: core.api(),
-        })
+        ptr.is_null()
+            .then_some(unsafe { Self::from_ptr(ptr, core.api()) })
     }
 }
 
@@ -172,7 +163,7 @@ impl Drop for VideoNode {
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct AudioNode {
-    handle: NonNull<ffi::VSNode>,
+    handle: *const ffi::VSNode,
     api: Api,
 }
 
@@ -188,13 +179,13 @@ impl Node for AudioNode {
     #[must_use]
     #[inline]
     fn as_ptr(&self) -> *mut ffi::VSNode {
-        self.handle.as_ptr()
+        self.handle.cast_mut()
     }
 
     fn get_frame_filter(&self, n: i32, ctx: &mut FrameContext) -> Self::FrameType {
         unsafe {
             AudioFrame::from_ptr(
-                (self.api.getFrameFilter)(n, self.as_ptr(), ctx.as_mut_ptr()),
+                (self.api.getFrameFilter)(n, self.as_ptr(), ctx.as_ptr()),
                 self.api,
             )
         }
@@ -204,10 +195,7 @@ impl Node for AudioNode {
 impl AudioNode {
     #[must_use]
     pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSNode, api: Api) -> Self {
-        Self {
-            handle: NonNull::new_unchecked(ptr),
-            api,
-        }
+        Self { handle: ptr, api }
     }
 
     #[must_use]
@@ -242,10 +230,8 @@ impl AudioNode {
                 core.as_ptr(),
             )
         };
-        NonNull::new(ptr).map(|handle| Self {
-            handle,
-            api: core.api(),
-        })
+        ptr.is_null()
+            .then_some(unsafe { Self::from_ptr(ptr, core.api()) })
     }
 }
 

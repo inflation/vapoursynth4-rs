@@ -7,10 +7,6 @@
 //! # vapoursynth4-rs
 //! A safe wrapper for `VapourSynth` API version 4.
 
-#![warn(clippy::pedantic)]
-// #![warn(missing_docs)]
-#![allow(clippy::module_name_repetitions)]
-
 pub mod api;
 pub mod core;
 pub mod frame;

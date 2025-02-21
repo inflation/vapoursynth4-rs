@@ -1,4 +1,4 @@
-use std::ffi::{c_void, CStr};
+use std::ffi::{CStr, c_void};
 
 use vapoursynth4_rs::{
     core::CoreRef,

@@ -1,9 +1,10 @@
 mod dither;
 
-use std::ffi::{c_void, CStr};
+use std::ffi::{CStr, c_void};
 
 use dither::DitherFilter;
 use vapoursynth4_rs::{
+    SampleType,
     core::CoreRef,
     declare_plugin,
     frame::{FrameContext, VideoFrame},
@@ -12,7 +13,6 @@ use vapoursynth4_rs::{
     node::{
         ActivationReason, Dependencies, Filter, FilterDependency, Node, RequestPattern, VideoNode,
     },
-    SampleType,
 };
 
 struct DumbFilter {

@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_char, CStr, CString},
+    ffi::{CStr, CString, c_char},
     fmt::{Debug, Display},
     ops::Deref,
     ptr,
@@ -87,11 +87,11 @@ impl KeyStr {
     /// # Safety
     /// The caller must ensure that the key is valid to contain only characters that are alphanumeric or underscore
     pub const unsafe fn from_cstr_unchecked(str: &CStr) -> &Self {
-        &*(ptr::from_ref(str) as *const KeyStr)
+        unsafe { &*(ptr::from_ref(str) as *const KeyStr) }
     }
 
     pub(crate) unsafe fn from_ptr<'a>(ptr: *const c_char) -> &'a Self {
-        Self::from_cstr(CStr::from_ptr(ptr))
+        Self::from_cstr(unsafe { CStr::from_ptr(ptr) })
     }
 }
 

@@ -10,13 +10,9 @@
 //!
 //! `VapourSynth`'s public API is all C.
 
-// #![allow(non_upper_case_globals)]
-#![allow(clippy::enum_glob_use)]
+use std::ffi::{c_char, c_double, c_float, c_int, c_void};
 
-use std::ffi::*;
-
-use super::opaque_struct;
-use super::*;
+use super::{opaque_struct, vs_make_version};
 
 /// Major API version.
 pub const VAPOURSYNTH_API_MAJOR: u16 = 4;
@@ -153,8 +149,8 @@ const fn vs_make_video_id(
         | sub_sampling_h
 }
 
-use VSColorFamily::*;
-use VSSampleType::*;
+use VSColorFamily::{Gray, RGB, YUV};
+use VSSampleType::{Float, Integer};
 
 /// The presets suffixed with H and S have floating point sample type.
 /// The H and S suffixes stand for half precision and single precision, respectively.
@@ -2210,7 +2206,7 @@ pub struct VSAPI {
 }
 
 #[link(name = "vapoursynth")]
-extern "system-unwind" {
+unsafe extern "system-unwind" {
     /// Returns a pointer to the global [`VSAPI`] instance.
     ///
     /// Returns `NULL` if the requested API version is not supported or

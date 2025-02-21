@@ -125,7 +125,7 @@ macro_rules! declare_plugin {
         $api_version:expr, $flags:expr
         $(, ($filter:tt, $data:expr) )*
     ) => {
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         pub unsafe extern "system-unwind" fn VapourSynthPluginInit2(
             plugin: *mut $crate::ffi::VSPlugin,
             vspapi: *const $crate::ffi::VSPLUGINAPI,
