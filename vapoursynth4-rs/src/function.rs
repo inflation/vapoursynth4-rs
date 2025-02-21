@@ -1,29 +1,24 @@
-use std::ptr::NonNull;
-
 use crate::{api::Api, ffi, map::Map};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Function {
-    handle: NonNull<ffi::VSFunction>,
+    handle: *const ffi::VSFunction,
     api: Api,
 }
 
 impl Function {
     pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSFunction, api: Api) -> Self {
-        Self {
-            handle: NonNull::new_unchecked(ptr),
-            api,
-        }
+        Self { handle: ptr, api }
     }
 
     #[must_use]
     pub fn as_ptr(&self) -> *mut ffi::VSFunction {
-        self.handle.as_ptr()
+        self.handle.cast_mut()
     }
 
     pub fn call(&mut self, in_: &Map, out: &mut Map) {
         unsafe {
-            (self.api.callFunction)(self.handle.as_ptr(), in_.as_ptr(), out.as_ptr());
+            (self.api.callFunction)(self.as_ptr(), in_.as_ptr(), out.as_ptr());
         }
     }
 }

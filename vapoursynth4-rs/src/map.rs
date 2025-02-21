@@ -1,8 +1,7 @@
 use std::{
-    ffi::{c_char, c_int, CStr},
+    ffi::{CStr, c_char, c_int},
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
-    ptr::NonNull,
 };
 
 use thiserror::Error;
@@ -10,7 +9,7 @@ use thiserror::Error;
 use crate::{
     api::Api,
     ffi,
-    frame::{internal::FrameFromPtr, AudioFrame, Frame, VideoFrame},
+    frame::{AudioFrame, Frame, VideoFrame, internal::FrameFromPtr},
     function::Function,
     node::{AudioNode, Node, VideoNode},
 };
@@ -23,7 +22,7 @@ pub use key::*;
 /// A borrowed reference to a [`ffi::VSMap`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MapRef<'m> {
-    handle: NonNull<ffi::VSMap>,
+    handle: *const ffi::VSMap,
     api: Api,
     marker: std::marker::PhantomData<&'m ()>,
 }
@@ -34,7 +33,7 @@ impl MapRef<'_> {
     pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSMap, api: Api) -> Self {
         debug_assert!(!ptr.is_null());
         Self {
-            handle: NonNull::new_unchecked(ptr.cast_mut()),
+            handle: ptr,
             api,
             marker: std::marker::PhantomData,
         }
@@ -43,7 +42,7 @@ impl MapRef<'_> {
     /// Returns a raw pointer to the wrapped value.
     #[inline]
     pub(crate) fn as_ptr(&self) -> *mut ffi::VSMap {
-        self.handle.as_ptr()
+        self.handle.cast_mut()
     }
 }
 
@@ -66,7 +65,7 @@ impl DerefMut for MapRef<'_> {
 /// An owned [`ffi::VSMap`].
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Map {
-    handle: NonNull<ffi::VSMap>,
+    handle: *const ffi::VSMap,
     api: Api,
 }
 
@@ -75,16 +74,13 @@ impl Map {
     #[must_use]
     pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSMap, api: Api) -> Self {
         debug_assert!(!ptr.is_null());
-        Self {
-            handle: NonNull::new_unchecked(ptr),
-            api,
-        }
+        Self { handle: ptr, api }
     }
 
     /// Returns a raw pointer to the wrapped value.
     #[must_use]
     pub fn as_ptr(&self) -> *mut ffi::VSMap {
-        self.handle.as_ptr()
+        self.handle.cast_mut()
     }
 }
 
@@ -142,11 +138,7 @@ impl Map {
     pub fn num_elements(&self, key: &KeyStr) -> Option<i32> {
         // safety: `self.handle` is a valid pointer
         let res = unsafe { (self.api.mapNumElements)(self.as_ptr(), key.as_ptr()) };
-        if res == -1 {
-            None
-        } else {
-            Some(res)
-        }
+        if res == -1 { None } else { Some(res) }
     }
 
     unsafe fn get_internal<T>(
@@ -161,7 +153,10 @@ impl Map {
         index: i32,
     ) -> Result<T, MapPropertyError> {
         let mut error = ffi::VSMapPropertyError::Success;
-        handle_get_error(func(self.as_ptr(), key.as_ptr(), index, &mut error), error)
+        handle_get_error(
+            unsafe { func(self.as_ptr(), key.as_ptr(), index, &mut error) },
+            error,
+        )
     }
 
     /// # Errors
@@ -396,7 +391,7 @@ impl Map {
         val: T,
         append: ffi::VSMapAppendMode,
     ) -> Result<(), MapPropertyError> {
-        handle_set_error(func(self.as_ptr(), key.as_ptr(), val, append))
+        handle_set_error(unsafe { func(self.as_ptr(), key.as_ptr(), val, append) })
     }
 
     /// # Errors
@@ -580,8 +575,8 @@ impl Default for Map {
 // MARK: Helper
 
 fn handle_get_error<T>(res: T, error: ffi::VSMapPropertyError) -> Result<T, MapPropertyError> {
-    use ffi::VSMapPropertyError as e;
     use MapPropertyError as pe;
+    use ffi::VSMapPropertyError as e;
 
     match error {
         e::Success => Ok(res),

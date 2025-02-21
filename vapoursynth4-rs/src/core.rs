@@ -9,28 +9,28 @@ use std::{
     marker::PhantomData,
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
 };
 
 use bon::bon;
 use core_builder::State;
 
 use crate::{
+    AudioInfo, ColorFamily, SampleType, VideoInfo,
     api::Api,
     ffi,
     frame::{
-        internal::FrameFromPtr, AudioFormat, AudioFrame, FormatName, Frame, VideoFormat, VideoFrame,
+        AudioFormat, AudioFrame, FormatName, Frame, VideoFormat, VideoFrame, internal::FrameFromPtr,
     },
     function::Function,
     map::{Map, MapRef},
-    node::{internal::FilterExtern, Dependencies, Filter},
+    node::{Dependencies, Filter, internal::FilterExtern},
     plugin::{Plugin, Plugins},
-    AudioInfo, ColorFamily, SampleType, VideoInfo,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CoreRef<'c> {
-    handle: NonNull<ffi::VSCore>,
+    handle: *const ffi::VSCore,
     api: Api,
     marker: PhantomData<&'c ()>,
 }
@@ -39,7 +39,7 @@ impl CoreRef<'_> {
     #[must_use]
     pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSCore, api: Api) -> Self {
         Self {
-            handle: NonNull::new_unchecked(ptr.cast_mut()),
+            handle: ptr.cast_mut(),
             api,
             marker: PhantomData,
         }
@@ -68,14 +68,14 @@ impl DerefMut for CoreRef<'_> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Core {
-    handle: NonNull<ffi::VSCore>,
+    handle: *const ffi::VSCore,
     api: Api,
 }
 
 impl Core {
     #[must_use]
     pub fn as_ptr(&self) -> *mut ffi::VSCore {
-        self.handle.as_ptr()
+        self.handle.cast_mut()
     }
 
     pub fn set_max_cache_size(&mut self, size: i64) {
@@ -388,7 +388,7 @@ impl Core {
 impl Drop for Core {
     fn drop(&mut self) {
         unsafe {
-            (self.api.freeCore)(self.handle.as_ptr());
+            (self.api.freeCore)(self.handle.cast_mut());
         }
     }
 }
@@ -398,10 +398,7 @@ impl Drop for Core {
 impl Core {
     unsafe fn new_with(flags: i32, api: Api) -> Self {
         let core = unsafe { (api.createCore)(flags) };
-        Self {
-            handle: NonNull::new_unchecked(core),
-            api,
-        }
+        Self { handle: core, api }
     }
 
     #[must_use]

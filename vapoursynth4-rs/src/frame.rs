@@ -4,8 +4,6 @@
  file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-use std::ptr::NonNull;
-
 use crate::{api::Api, ffi, map::MapRef};
 
 mod context;
@@ -15,7 +13,6 @@ pub use context::*;
 pub use format::*;
 
 pub trait Frame: Sized + internal::FrameFromPtr {
-    #[doc(hidden)]
     fn api(&self) -> Api;
 
     #[must_use]
@@ -26,7 +23,7 @@ pub trait Frame: Sized + internal::FrameFromPtr {
     fn properties(&self) -> Option<MapRef> {
         unsafe {
             let ptr = (self.api().getFramePropertiesRO)(self.as_ptr());
-            NonNull::new(ptr.cast_mut()).map(|x| MapRef::from_ptr(x.as_ptr(), self.api()))
+            ptr.is_null().then_some(MapRef::from_ptr(ptr, self.api()))
         }
     }
 
@@ -35,37 +32,42 @@ pub trait Frame: Sized + internal::FrameFromPtr {
     fn properties_mut(&mut self) -> Option<MapRef> {
         unsafe {
             let ptr = (self.api().getFramePropertiesRW)(self.as_ptr());
-            NonNull::new(ptr).map(|x| MapRef::from_ptr(x.as_ptr(), self.api()))
+            ptr.is_null().then_some(MapRef::from_ptr(ptr, self.api()))
         }
     }
 }
 
 pub(crate) mod internal {
-    use crate::api::Api;
-
-    use super::ffi;
+    use super::{Api, AudioFrame, VideoFrame, ffi};
 
     pub trait FrameFromPtr {
         unsafe fn from_ptr(ptr: *const ffi::VSFrame, api: Api) -> Self;
+    }
+
+    impl FrameFromPtr for VideoFrame {
+        #[inline]
+        unsafe fn from_ptr(ptr: *const ffi::VSFrame, api: Api) -> Self {
+            VideoFrame {
+                handle: ptr.cast_mut(),
+                api,
+            }
+        }
+    }
+
+    impl FrameFromPtr for AudioFrame {
+        unsafe fn from_ptr(ptr: *const ffi::VSFrame, api: Api) -> Self {
+            AudioFrame { handle: ptr, api }
+        }
     }
 }
 use internal::FrameFromPtr;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct VideoFrame {
-    handle: NonNull<ffi::VSFrame>,
+    handle: *const ffi::VSFrame,
     api: Api,
 }
 
-impl internal::FrameFromPtr for VideoFrame {
-    #[inline]
-    unsafe fn from_ptr(ptr: *const ffi::VSFrame, api: Api) -> Self {
-        VideoFrame {
-            handle: NonNull::new_unchecked(ptr.cast_mut()),
-            api,
-        }
-    }
-}
 impl Frame for VideoFrame {
     #[inline]
     fn api(&self) -> Api {
@@ -74,7 +76,7 @@ impl Frame for VideoFrame {
 
     #[inline]
     fn as_ptr(&self) -> *mut ffi::VSFrame {
-        self.handle.as_ptr()
+        self.handle.cast_mut()
     }
 }
 
@@ -124,37 +126,29 @@ impl VideoFrame {
 
 impl Clone for VideoFrame {
     fn clone(&self) -> Self {
-        unsafe { Self::from_ptr((self.api.addFrameRef)(self.handle.as_ptr()), self.api) }
+        unsafe { Self::from_ptr((self.api.addFrameRef)(self.handle), self.api) }
     }
 }
 
 impl Drop for VideoFrame {
     fn drop(&mut self) {
-        unsafe { (self.api.freeFrame)(self.handle.as_ptr()) }
+        unsafe { (self.api.freeFrame)(self.handle) }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct AudioFrame {
-    handle: NonNull<ffi::VSFrame>,
+    handle: *const ffi::VSFrame,
     api: Api,
 }
 
-impl internal::FrameFromPtr for AudioFrame {
-    unsafe fn from_ptr(ptr: *const ffi::VSFrame, api: Api) -> Self {
-        AudioFrame {
-            handle: NonNull::new_unchecked(ptr.cast_mut()),
-            api,
-        }
-    }
-}
 impl Frame for AudioFrame {
     fn api(&self) -> Api {
         self.api
     }
 
     fn as_ptr(&self) -> *mut ffi::VSFrame {
-        self.handle.as_ptr()
+        self.handle.cast_mut()
     }
 }
 
@@ -177,13 +171,13 @@ impl AudioFrame {
 
 impl Clone for AudioFrame {
     fn clone(&self) -> Self {
-        unsafe { Self::from_ptr((self.api.addFrameRef)(self.handle.as_ptr()), self.api) }
+        unsafe { Self::from_ptr((self.api.addFrameRef)(self.handle), self.api) }
     }
 }
 
 impl Drop for AudioFrame {
     fn drop(&mut self) {
-        unsafe { (self.api.freeFrame)(self.handle.as_ptr()) }
+        unsafe { (self.api.freeFrame)(self.handle) }
     }
 }
 

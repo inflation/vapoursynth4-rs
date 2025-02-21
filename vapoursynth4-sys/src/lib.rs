@@ -6,8 +6,6 @@
 
 //! Raw bindings to [VapourSynth](https://github.com/vapoursynth/vapoursynth).
 
-#![warn(clippy::pedantic)]
-#![allow(clippy::wildcard_imports)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 mod constants;

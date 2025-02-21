@@ -30,9 +30,9 @@
 
 #![cfg(feature = "vsscript")]
 
-use std::ffi::*;
+use std::ffi::{c_char, c_int, c_void};
 
-use super::*;
+use super::{VSAPI, VSCore, VSMap, VSNode, opaque_struct, vs_make_version};
 
 pub const VSSCRIPT_API_MAJOR: u16 = 4;
 pub const VSSCRIPT_API_MINOR: u16 = if cfg!(feature = "vsscript-42") { 2 } else { 1 };
@@ -227,7 +227,7 @@ pub struct VSSCRIPTAPI {
 
 #[cfg_attr(target_os = "windows", link(name = "VSScript"))]
 #[cfg_attr(not(target_os = "windows"), link(name = "vapoursynth-script"))]
-extern "system-unwind" {
+unsafe extern "system-unwind" {
     /// Returns a struct containing function pointer for the api.
     /// Will return `NULL` is the specified version isn’t supported.
     ///

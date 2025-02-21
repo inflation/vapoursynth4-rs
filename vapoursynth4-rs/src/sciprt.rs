@@ -1,6 +1,6 @@
 use std::{
-    ffi::{c_int, CStr},
-    ptr::{null_mut, NonNull},
+    ffi::{CStr, c_int},
+    ptr::{NonNull, null_mut},
 };
 
 use thiserror::Error;

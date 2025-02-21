@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_void, CStr},
+    ffi::{CStr, c_void},
     ptr::null_mut,
 };
 
@@ -64,19 +64,20 @@ impl<F: Filter> FilterRegister<F> {
     }
 
     /// # Safety
-    #[doc(hidden)]
     pub unsafe fn register(self, plugin: *mut ffi::VSPlugin, vspapi: *const ffi::VSPLUGINAPI) {
         use super::internal::FilterExtern;
 
-        ((*vspapi).registerFunction)(
-            F::NAME.as_ptr(),
-            F::ARGS.as_ptr(),
-            F::RETURN_TYPE.as_ptr(),
-            F::filter_create,
-            self.data
-                .map_or(null_mut(), |d| Box::into_raw(Box::new(d)).cast()),
-            plugin,
-        );
+        unsafe {
+            ((*vspapi).registerFunction)(
+                F::NAME.as_ptr(),
+                F::ARGS.as_ptr(),
+                F::RETURN_TYPE.as_ptr(),
+                F::filter_create,
+                self.data
+                    .map_or(null_mut(), |d| Box::into_raw(Box::new(d)).cast()),
+                plugin,
+            )
+        };
     }
 }
 

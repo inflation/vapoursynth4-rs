@@ -1,6 +1,6 @@
 [package]
 name = "vapoursynth4-sys"
-edition = "2021"
+edition = "2024"
 version = "0.3.0"
 authors = ["Inflation <rust@kosmopho.dev>"]
 description = "Rust bindings for VapourSynth and VSScript API version 4"
@@ -36,3 +36,4 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [lints.clippy]
 pedantic = "warn"
+cast_possible_wrap = "allow"
