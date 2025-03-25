@@ -139,16 +139,17 @@ declare_plugin!(
 #[cfg(test)]
 mod tests {
     use testresult::TestResult;
-    use vapoursynth4_rs::sciprt::Script;
+    use vapoursynth4_rs::sciprt::{OutputNode, Script};
 
     #[test]
     fn test_vsscript_works() -> TestResult {
         let vss = Script::default();
         vss.evaluate_file(c"test.vpy")?;
         let node = vss.get_output(0)?;
-        unsafe {
-            (vss.get_api().freeNode)(node);
-        }
+        let OutputNode::Video(vn) = node else {
+            return Err("Expected video node".into());
+        };
+        let _info = vn.info();
 
         Ok(())
     }

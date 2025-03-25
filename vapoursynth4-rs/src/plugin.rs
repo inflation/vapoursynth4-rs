@@ -133,19 +133,21 @@ macro_rules! declare_plugin {
             plugin: *mut $crate::ffi::VSPlugin,
             vspapi: *const $crate::ffi::VSPLUGINAPI,
         ) {
-            ((*vspapi).configPlugin)(
-                $id.as_ptr(),
-                $name.as_ptr(),
-                $desc.as_ptr(),
-                $crate::utils::make_version($version.0, $version.1),
-                $crate::VAPOURSYNTH_API_VERSION,
-                $flags,
-                plugin,
-            );
+            unsafe {
+                ((*vspapi).configPlugin)(
+                    $id.as_ptr(),
+                    $name.as_ptr(),
+                    $desc.as_ptr(),
+                    $crate::utils::make_version($version.0, $version.1),
+                    $crate::VAPOURSYNTH_API_VERSION,
+                    $flags,
+                    plugin,
+                );
 
-            $(
-                $crate::node::FilterRegister::<$filter>::new($data).register(plugin, vspapi);
-            )*
+                $(
+                    $crate::node::FilterRegister::<$filter>::new($data).register(plugin, vspapi);
+                )*
+            }
         }
     };
 }
