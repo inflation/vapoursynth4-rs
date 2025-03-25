@@ -113,7 +113,10 @@ impl Iterator for Plugins<'_> {
         unsafe {
             let api = self.core.api();
             let ptr = (api.getNextPlugin)(self.cursor, self.core.as_ptr());
-            NonNull::new(ptr).map(|p| Plugin::new(p, api))
+            NonNull::new(ptr).map(|p| {
+                self.cursor = ptr;
+                Plugin::new(p, api)
+            })
         }
     }
 }
