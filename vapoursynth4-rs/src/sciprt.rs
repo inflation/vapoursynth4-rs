@@ -4,11 +4,11 @@ use std::{
 };
 
 use thiserror::Error;
-use vapoursynth4_sys::VSNode;
 
 use crate::{
     api::{Api, VssApi},
     core::{Core, CoreRef},
+    node::{AudioNode, VideoNode},
 };
 
 use super::ffi;
@@ -18,6 +18,12 @@ pub struct Script {
     handle: NonNull<ffi::VSScript>,
     vssapi: VssApi,
     api: Api,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum OutputNode {
+    Audio(AudioNode),
+    Video(VideoNode),
 }
 
 impl Script {
@@ -89,8 +95,19 @@ impl Script {
     /// # Errors
     ///
     /// Returns a `ScriptError` if the output node could not be retrieved.
-    pub fn get_output(&self, index: c_int) -> Result<*mut VSNode, ScriptError> {
-        unsafe { self.get_ptr_error((self.vssapi.getOutputNode)(self.handle.as_ptr(), index)) }
+    pub fn get_output(&self, index: c_int) -> Result<OutputNode, ScriptError> {
+        unsafe {
+            let ptr =
+                self.get_ptr_error((self.vssapi.getOutputNode)(self.handle.as_ptr(), index))?;
+            match (self.api.getNodeType)(ptr) {
+                ffi::VSMediaType::Audio => {
+                    Ok(OutputNode::Audio(AudioNode::from_ptr(ptr, self.api)))
+                }
+                ffi::VSMediaType::Video => {
+                    Ok(OutputNode::Video(VideoNode::from_ptr(ptr, self.api)))
+                }
+            }
+        }
     }
 }
 

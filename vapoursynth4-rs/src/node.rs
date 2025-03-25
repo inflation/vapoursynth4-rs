@@ -107,8 +107,11 @@ impl Node for VideoNode {
 }
 
 impl VideoNode {
+    /// # Safety
+    ///
+    /// The caller must ensure that `ptr` is a valid pointer to a [`ffi::VSNode`] that represents a video node.
     #[must_use]
-    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSNode, api: Api) -> Self {
+    pub unsafe fn from_ptr(ptr: *mut ffi::VSNode, api: Api) -> Self {
         Self { handle: ptr, api }
     }
 
@@ -193,8 +196,11 @@ impl Node for AudioNode {
 }
 
 impl AudioNode {
+    /// # Safety
+    ///
+    /// The caller must ensure that `ptr` is a valid pointer to a [`ffi::VSNode`] that represents an audio node.
     #[must_use]
-    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSNode, api: Api) -> Self {
+    pub unsafe fn from_ptr(ptr: *mut ffi::VSNode, api: Api) -> Self {
         Self { handle: ptr, api }
     }
 
