@@ -74,7 +74,10 @@ impl Iterator for Functions<'_> {
                 self.cursor,
                 self.plugin.as_ptr().cast_mut(),
             );
-            NonNull::new(ptr).map(|p| PluginFunction::new(p, self.plugin.api))
+            NonNull::new(ptr).map(|p| {
+                self.cursor = ptr;
+                PluginFunction::new(p, self.plugin.api)
+            })
         }
     }
 }
