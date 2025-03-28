@@ -8,7 +8,7 @@ mod dependency;
 mod filter;
 pub(crate) mod internal;
 
-use std::ffi::{CStr, CString};
+use std::ffi::{CStr, CString, c_void};
 
 use crate::{
     AudioInfo, VideoInfo,
@@ -21,8 +21,9 @@ use crate::{
 
 pub use dependency::*;
 pub use filter::*;
+use vapoursynth4_sys::VSFrameDoneCallback;
 
-pub trait Node: Sized + crate::_private::Sealed {
+pub trait Node: Sized + Send + Sync + crate::_private::Sealed {
     type FrameType: Frame;
 
     fn api(&self) -> Api;
@@ -65,12 +66,16 @@ pub trait Node: Sized + crate::_private::Sealed {
     }
 
     // TODO: Find a better way to handle callbacks
-    fn get_frame_async<D, F, Fr>(&self, _n: i32, _data: &mut D)
-    where
-        F: Fn(D, Fr, i32) -> Result<(), String>,
-        Fr: Frame,
-    {
-        todo!()
+    /// # Safety
+    ///
+    /// The caller must ensure that:
+    /// - `data` is a valid pointer to the data needed by the callback
+    /// - `callback` is a valid function pointer that safely handles the frame data
+    /// - The callback and data remain valid until the frame processing is complete
+    unsafe fn get_frame_async(&self, n: i32, data: *mut c_void, callback: VSFrameDoneCallback) {
+        unsafe {
+            (self.api().getFrameAsync)(n, self.as_ptr(), callback, data);
+        }
     }
 }
 
@@ -81,6 +86,9 @@ pub struct VideoNode {
 }
 
 impl crate::_private::Sealed for VideoNode {}
+unsafe impl Send for VideoNode {}
+unsafe impl Sync for VideoNode {}
+
 impl Node for VideoNode {
     type FrameType = VideoFrame;
 
@@ -171,6 +179,9 @@ pub struct AudioNode {
 }
 
 impl crate::_private::Sealed for AudioNode {}
+unsafe impl Send for AudioNode {}
+unsafe impl Sync for AudioNode {}
+
 impl Node for AudioNode {
     type FrameType = AudioFrame;
 

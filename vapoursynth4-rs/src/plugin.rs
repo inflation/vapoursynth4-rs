@@ -14,6 +14,9 @@ pub struct Plugin {
     api: Api,
 }
 
+unsafe impl Send for Plugin {}
+unsafe impl Sync for Plugin {}
+
 impl Plugin {
     #[must_use]
     pub fn new(handle: NonNull<ffi::VSPlugin>, api: Api) -> Self {

@@ -27,6 +27,8 @@ pub struct MapRef<'m> {
     marker: std::marker::PhantomData<&'m ()>,
 }
 
+unsafe impl Send for MapRef<'_> {}
+
 impl MapRef<'_> {
     // Safety: `ptr` must be valid
     #[inline]
@@ -68,6 +70,8 @@ pub struct Map {
     handle: *const ffi::VSMap,
     api: Api,
 }
+
+unsafe impl Send for Map {}
 
 impl Map {
     // Safety: `ptr` must be a valid, owned instance created by `api`.

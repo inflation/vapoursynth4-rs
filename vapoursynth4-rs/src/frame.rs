@@ -12,7 +12,7 @@ mod format;
 pub use context::*;
 pub use format::*;
 
-pub trait Frame: Sized + internal::FrameFromPtr {
+pub trait Frame: Sized + Send + internal::FrameFromPtr {
     fn api(&self) -> Api;
 
     #[must_use]
@@ -67,6 +67,8 @@ pub struct VideoFrame {
     handle: *const ffi::VSFrame,
     api: Api,
 }
+
+unsafe impl Send for VideoFrame {}
 
 impl Frame for VideoFrame {
     #[inline]
@@ -141,6 +143,8 @@ pub struct AudioFrame {
     handle: *const ffi::VSFrame,
     api: Api,
 }
+
+unsafe impl Send for AudioFrame {}
 
 impl Frame for AudioFrame {
     fn api(&self) -> Api {

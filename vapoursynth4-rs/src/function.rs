@@ -6,6 +6,8 @@ pub struct Function {
     api: Api,
 }
 
+unsafe impl Send for Function {}
+
 impl Function {
     pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSFunction, api: Api) -> Self {
         Self { handle: ptr, api }
