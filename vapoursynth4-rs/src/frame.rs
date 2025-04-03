@@ -23,7 +23,7 @@ pub trait Frame: Sized + Send + internal::FrameFromPtr {
     fn properties(&self) -> Option<MapRef> {
         unsafe {
             let ptr = (self.api().getFramePropertiesRO)(self.as_ptr());
-            ptr.is_null().then_some(MapRef::from_ptr(ptr, self.api()))
+            (!ptr.is_null()).then_some(MapRef::from_ptr(ptr, self.api()))
         }
     }
 
@@ -32,7 +32,7 @@ pub trait Frame: Sized + Send + internal::FrameFromPtr {
     fn properties_mut(&mut self) -> Option<MapRef> {
         unsafe {
             let ptr = (self.api().getFramePropertiesRW)(self.as_ptr());
-            ptr.is_null().then_some(MapRef::from_ptr(ptr, self.api()))
+            (!ptr.is_null()).then_some(MapRef::from_ptr(ptr, self.api()))
         }
     }
 }
