@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-rs-v0.4.0...vapoursynth4-rs-v0.5.0)
+
+### 📦 Dependencies
+
+- (deps): update const-str requirement from 0.6.1 to 0.7.0 - ([a3ca813](https://github.com/inflation/vapoursynth4-rs/commit/a3ca813565504266cfa3b1f7015d791f4404c70c))
+
 ## [0.4.0](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-rs-v0.3.0...vapoursynth4-rs-v0.4.0)
 
 ### 🚜 Refactor

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.3.2](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.3.1...vapoursynth4-sys-v0.3.2)
+
+### 🐛 Bug Fixes
+
+- Put links behind the link-library feature flag - ([e9ad3c0](https://github.com/inflation/vapoursynth4-rs/commit/e9ad3c0f38ac1b2ec961594f651be76c3f7999f4))
+
 ## [0.3.1](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.3.0...vapoursynth4-sys-v0.3.1)
 
 ### 🚜 Refactor
