@@ -54,7 +54,7 @@ impl Script {
     /// # Errors
     ///
     /// Returns an error message if the core could not be retrieved.
-    pub fn core(&self) -> Result<CoreRef, ScriptError> {
+    pub fn core(&self) -> Result<CoreRef<'_>, ScriptError> {
         unsafe {
             let core = (self.vssapi.getCore)(self.handle.as_ptr());
             self.get_ptr_error(core)

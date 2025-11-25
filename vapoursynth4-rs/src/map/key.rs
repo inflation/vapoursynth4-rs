@@ -69,6 +69,8 @@ pub struct KeyStr {
 
 impl KeyStr {
     #[must_use]
+    /// # Panics
+    /// Panics if the key contains characters that are not alphanumeric or underscore
     pub const fn from_cstr(str: &CStr) -> &Self {
         let mut i = 0;
         let slice = str.to_bytes();

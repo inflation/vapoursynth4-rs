@@ -36,37 +36,37 @@ opaque_struct!(
     ///
     /// Audio data is also guaranteed to be at least 32 byte aligned.
     ///
-    /// Any data can be attached to a frame, using a VSMap.
+    /// Any data can be attached to a frame, using a `VSMap`.
     VSFrame,
     /// A reference to a node in the constructed filter graph. Its primary use is as an argument
     /// to other filter or to request frames from.
     VSNode,
-    /// The core represents one instance of VapourSynth.
+    /// The core represents one instance of `VapourSynth`.
     /// Every core individually loads plugins and keeps track of memory.
     VSCore,
-    /// A VapourSynth plugin. There are a few of these built into the core,
+    /// A `VapourSynth` plugin. There are a few of these built into the core,
     /// and therefore available at all times: the basic filters (identifier `com.vapoursynth.std`,
     /// namespace `std`), the resizers (identifier `com.vapoursynth.resize`, namespace `resize`),
     /// and the Avisynth compatibility module, if running in Windows
     /// (identifier `com.vapoursynth.avisynth`, namespace `avs`).
     ///
-    /// The Function Reference describes how to load VapourSynth and Avisynth plugins.
+    /// The Function Reference describes how to load `VapourSynth` and Avisynth plugins.
     ///
     /// A [`VSPlugin`] instance is constructed by the core when loading a plugin
     /// (.so / .dylib / .dll), and the pointer is passed to the plugin's
     /// `VapourSynthPluginInit2()` function.
     ///
-    /// A VapourSynth plugin can export any number of filters.
+    /// A `VapourSynth` plugin can export any number of filters.
     ///
     /// Plugins have a few attributes:
     ///
-    /// - An identifier, which must be unique among all VapourSynth plugins in existence,
+    /// - An identifier, which must be unique among all `VapourSynth` plugins in existence,
     ///   because this is what the core uses to make sure a plugin only gets loaded once.
     /// - A namespace, also unique. The filters exported by a plugin end up
     ///     in the plugin's namespace.
     /// - A full name, which is used by the core in a few error messages.
     /// - The version of the plugin.
-    /// - The VapourSynth API version the plugin requires.
+    /// - The `VapourSynth` API version the plugin requires.
     /// - A file name.
     ///
     /// Things you can do with a [`VSPlugin`]:
@@ -79,7 +79,7 @@ opaque_struct!(
     /// All loaded plugins (including built-in) can be enumerated with
     /// [`getNextPlugin()`](VSAPI::getNextPlugin).
     ///
-    /// Once loaded, a plugin only gets unloaded when the VapourSynth core is freed.
+    /// Once loaded, a plugin only gets unloaded when the `VapourSynth` core is freed.
     VSPlugin,
     /// A function belonging to a Vapoursynth plugin. This object primarily exists
     /// so a plugin's name, argument list and return type can be queried by editors.
@@ -98,7 +98,7 @@ opaque_struct!(
     ///
     /// The pairs in a [`VSMap`] are sorted by key.
     ///
-    /// **In VapourSynth, [`VSMap`]s have several uses:**
+    /// **In `VapourSynth`, [`VSMap`]s have several uses:**
     /// - storing filters' arguments and return values
     /// - storing user-defined functions' arguments and return values
     /// - storing the properties attached to frames
@@ -574,19 +574,19 @@ pub type VSGetVapourSynthAPI = unsafe extern "system-unwind" fn(version: c_int) 
 ///
 ///     Use [`mapGetInt()`](VSAPI::mapGetInt) and friends to retrieve a parameter value.
 ///
-///     The map is guaranteed to exist only until the filter's "init" function returns.
-///     In other words, pointers returned by [`mapGetData()`](VSAPI::mapGetData)
-///     will not be usable in the filter's "getFrame" and "free" functions.
+///   The map is guaranteed to exist only until the filter's "init" function returns.
+///   In other words, pointers returned by [`mapGetData()`](VSAPI::mapGetData)
+///   will not be usable in the filter's "getFrame" and "free" functions.
 ///
 /// * `out` - Output parameter list. [`createAudioFilter()`](VSAPI::createAudioFilter) or
-///     [`createVideoFilter()`](VSAPI::createVideoFilter) will add the output node(s)
-///     with the key named "clip", or an error, if something went wrong.
+///   [`createVideoFilter()`](VSAPI::createVideoFilter) will add the output node(s)
+///   with the key named "clip", or an error, if something went wrong.
 ///
 /// * `userData` - Pointer that was passed to [`registerFunction()`](VSAPI::registerFunction).
 pub type VSPublicFunction = unsafe extern "system-unwind" fn(
     in_: *const VSMap,
     out: *mut VSMap,
-    userData: *mut c_void,
+    user_data: *mut c_void,
     core: *mut VSCore,
     vsapi: *const VSAPI,
 );
@@ -598,13 +598,13 @@ pub type VSPublicFunction = unsafe extern "system-unwind" fn(
 ///
 /// * `plugin` - A pointer to the plugin object to be initialized.
 /// * `vspapi` - A pointer to a [`VSPLUGINAPI`] struct with a subset of the `VapourSynth` API
-///     used for initializing plugins. The proper way to do things is to call
-///     [`configPlugin`](VSPLUGINAPI::configPlugin) and then
-///     [`registerFunction`](VSPLUGINAPI::registerFunction) for each function to export.
+///   used for initializing plugins. The proper way to do things is to call
+///   [`configPlugin`](VSPLUGINAPI::configPlugin) and then
+///   [`registerFunction`](VSPLUGINAPI::registerFunction) for each function to export.
 pub type VSInitPlugin =
     unsafe extern "system-unwind" fn(plugin: *mut VSPlugin, vspapi: *const VSPLUGINAPI);
 /// Free function type
-pub type VSFreeFunctionData = Option<unsafe extern "system-unwind" fn(userData: *mut c_void)>;
+pub type VSFreeFunctionData = Option<unsafe extern "system-unwind" fn(user_data: *mut c_void)>;
 /// A filter's "getFrame" function. It is called by the core when it needs the filter
 /// to generate a frame.
 ///
@@ -624,34 +624,34 @@ pub type VSFreeFunctionData = Option<unsafe extern "system-unwind" fn(userData: 
 /// * `n` - Requested frame number.
 /// * `activationReason` - One of [`VSActivationReason`].
 ///
-///     ## Note
+///   ## Note
 ///
-///     This function is first called with [`VSActivationReason::Initial`].
-///     At this point the function should request the input frames it needs and return `NULL`.
-///     When one or all of the requested frames are ready, this function is called again with
-///     [`VSActivationReason::AllFramesReady`].
-///     The function should only return a frame when called with
-///     [`VSActivationReason::AllFramesReady`].
+///   This function is first called with [`VSActivationReason::Initial`].
+///   At this point the function should request the input frames it needs and return `NULL`.
+///   When one or all of the requested frames are ready, this function is called again with
+///   [`VSActivationReason::AllFramesReady`].
+///   The function should only return a frame when called with
+///   [`VSActivationReason::AllFramesReady`].
 ///
-///     If a the function is called with [`VSActivationReason::Error`] all processing has
-///     to be aborted and any.
+///   If a the function is called with [`VSActivationReason::Error`] all processing has
+///   to be aborted and any.
 ///
-/// * `instanceData` - The filter's private instance data.
-/// * `frameData` - Optional private data associated with output frame number `n`.
+///   * `instanceData` - The filter's private instance data.
+///   * `frameData` - Optional private data associated with output frame number `n`.
 ///     It must be deallocated before the last call for the given frame
 ///     ([`VSActivationReason::AllFramesReady`] or error).
 ///
-///     It points to a `void *[4]` array of memory that may be used freely.
-///     See filters like Splice and Trim for examples.
+///   It points to a `void *[4]` array of memory that may be used freely.
+///   See filters like Splice and Trim for examples.
 ///
 /// Return a reference to the output frame number n when it is ready, or `NULL`.
 /// The ownership of the frame is transferred to the caller.
 pub type VSFilterGetFrame = unsafe extern "system-unwind" fn(
     n: c_int,
-    activationReason: VSActivationReason,
-    instanceData: *mut c_void,
-    frameData: *mut *mut c_void,
-    frameCtx: *mut VSFrameContext,
+    activation_reason: VSActivationReason,
+    instance_data: *mut c_void,
+    frame_data: *mut *mut c_void,
+    frame_ctx: *mut VSFrameContext,
     core: *mut VSCore,
     vsapi: *const VSAPI,
 ) -> *const VSFrame;
@@ -664,7 +664,7 @@ pub type VSFilterGetFrame = unsafe extern "system-unwind" fn(
 /// * `instanceData` - The filter's private instance data.
 pub type VSFilterFree = Option<
     unsafe extern "system-unwind" fn(
-        instanceData: *mut c_void,
+        instance_data: *mut c_void,
         core: *mut VSCore,
         vsapi: *const VSAPI,
     ),
@@ -686,36 +686,36 @@ pub type VSFilterFree = Option<
 /// # Arguments
 ///
 /// * `userData` - Pointer to private data from the client application,
-///     as passed previously to [`getFrameAsync()`](VSAPI::getFrameAsync).
+///   as passed previously to [`getFrameAsync()`](VSAPI::getFrameAsync).
 ///
 /// * `f` - Contains a reference to the generated frame, or `NULL` in case of failure.
-///     The ownership of the frame is transferred to the caller.
+///   The ownership of the frame is transferred to the caller.
 ///
 /// * `n` - The frame number.
 ///
 /// * `node` - Node the frame belongs to.
 ///
 /// * `errorMsg` - String that usually contains an error message if the frame generation failed.
-///     `NULL` if there is no error.
+///   `NULL` if there is no error.
 pub type VSFrameDoneCallback = unsafe extern "system-unwind" fn(
-    userData: *mut c_void,
+    user_data: *mut c_void,
     f: *const VSFrame,
     n: c_int,
     node: *mut VSNode,
-    errorMsg: *const c_char,
+    error_msg: *const c_char,
 );
 /// # Arguments
 ///
 /// * `msgType` - The type of message. One of [`VSMessageType`].
 ///
-///     If `msgType` is [`VSMessageType::Fatal`]),
-///     `VapourSynth` will call `abort()` after the message handler returns.
+///   If `msgType` is [`VSMessageType::Fatal`]),
+///   `VapourSynth` will call `abort()` after the message handler returns.
 ///
 /// * `msg` - The message.
 pub type VSLogHandler = Option<
-    unsafe extern "system-unwind" fn(msgType: c_int, msg: *const c_char, userData: *mut c_void),
+    unsafe extern "system-unwind" fn(msg_type: c_int, msg: *const c_char, user_data: *mut c_void),
 >;
-pub type VSLogHandlerFree = Option<unsafe extern "system-unwind" fn(userData: *mut c_void)>;
+pub type VSLogHandlerFree = Option<unsafe extern "system-unwind" fn(user_data: *mut c_void)>;
 // !SECTION
 
 /// This struct is used to access `VapourSynth`'s API when a plugin is initially loaded.
@@ -736,10 +736,10 @@ pub struct VSPLUGINAPI {
     /// Returns non-zero on success.
     pub configPlugin: unsafe extern "system-unwind" fn(
         identifier: *const c_char,
-        pluginNamespace: *const c_char,
+        plugin_namespace: *const c_char,
         name: *const c_char,
-        pluginVersion: c_int,
-        apiVersion: c_int,
+        plugin_version: c_int,
+        api_version: c_int,
         flags: c_int,
         plugin: *mut VSPlugin,
     ) -> c_int,
@@ -780,7 +780,7 @@ pub struct VSAPI {
     /// * `out` - Output map for the filter node.
     ///
     /// * `name` - Instance name. Please make it the same as
-    ///     the filter's name for easy identification.
+    ///   the filter's name for easy identification.
     ///
     /// * `vi` - The output format of the filter.
     ///
@@ -789,15 +789,15 @@ pub struct VSAPI {
     /// * `free` - The filter's "free" function. Can be `NULL`.
     ///
     /// * `filterMode` - One of [`VSFilterMode`].
-    ///     Indicates the level of parallelism supported by the filter.
+    ///   Indicates the level of parallelism supported by the filter.
     ///
     /// * `dependencies` - An array of nodes the filter requests frames from
-    ///     and the access pattern. Used to more efficiently configure caches.
+    ///   and the access pattern. Used to more efficiently configure caches.
     ///
     /// * `numDeps` - Length of the dependencies array.
     ///
     /// * `instanceData` - A pointer to the private filter data. This pointer will be passed to
-    ///     the `getFrame` and `free` functions. It should be freed by the free function.
+    ///   the `getFrame` and `free` functions. It should be freed by the free function.
     ///
     /// After this function returns, `out` will contain the new node appended to
     /// the "clip" property, or an error, if something went wrong.
@@ -835,7 +835,7 @@ pub struct VSAPI {
     /// * `out` - Output map for the filter node.
     ///
     /// * `name` - Instance name. Please make it the same as
-    ///     the filter's name for easy identification.
+    ///   the filter's name for easy identification.
     ///
     /// * `ai` - The output format of the filter.
     ///
@@ -844,15 +844,15 @@ pub struct VSAPI {
     /// * `free` - The filter's "free" function. Can be `NULL`.
     ///
     /// * `filterMode` - One of [`VSFilterMode`].
-    ///     Indicates the level of parallelism supported by the filter.
+    ///   Indicates the level of parallelism supported by the filter.
     ///
     /// * `dependencies` - An array of nodes the filter requests frames from
-    ///     and the access pattern. Used to more efficiently configure caches.
+    ///   and the access pattern. Used to more efficiently configure caches.
     ///
     /// * `numDeps` - Length of the dependencies array.
     ///
     /// * `instanceData` - A pointer to the private filter data. This pointer will be passed to
-    ///     the `getFrame` and `free` functions. It should be freed by the free function.
+    ///   the `getFrame` and `free` functions. It should be freed by the free function.
     ///
     /// After this function returns, out will contain the new node appended to
     /// the "clip" property, or an error, if something went wrong.
@@ -904,12 +904,12 @@ pub struct VSAPI {
     /// * `fixedSize` - Set to non-zero to make the cache always hold `maxSize` frames.
     ///
     /// * `maxSize` - The maximum number of frames to cache.
-    ///     Note that this value is automatically adjusted using
-    ///     an internal algorithm unless fixedSize is set.
+    ///   Note that this value is automatically adjusted using
+    ///   an internal algorithm unless fixedSize is set.
     ///
     /// * `maxHistorySize` - How many frames that have been recently evicted from the cache to
-    ///     keep track off. Used to determine if growing or shrinking the cache is beneficial.
-    ///     Has no effect when `fixedSize` is set.
+    ///   keep track off. Used to determine if growing or shrinking the cache is beneficial.
+    ///   Has no effect when `fixedSize` is set.
     pub setCacheOptions: unsafe extern "system-unwind" fn(
         node: *mut VSNode,
         fixedSize: c_int,
@@ -947,7 +947,7 @@ pub struct VSAPI {
     ///
     /// * `width` -
     /// * `height` - The desired dimensions of the frame, in pixels.
-    ///     Must be greater than 0 and have a suitable multiple for the subsampling in format.
+    ///   Must be greater than 0 and have a suitable multiple for the subsampling in format.
     ///
     /// * `propSrc` - A frame from which properties will be copied. Can be `NULL`.
     ///
@@ -973,14 +973,14 @@ pub struct VSAPI {
     ///
     /// * `width` -
     /// * `height` - The desired dimensions of the frame, in pixels.
-    ///     Must be greater than 0 and have a suitable multiple for the subsampling in format.
+    ///   Must be greater than 0 and have a suitable multiple for the subsampling in format.
     ///
     /// * `planeSrc` - Array of frames from which planes will be copied.
-    ///     If any elements of the array are `NULL`, the corresponding planes in the new frame
-    ///     will contain uninitialised memory.
+    ///   If any elements of the array are `NULL`, the corresponding planes in the new frame
+    ///   will contain uninitialised memory.
     ///
     /// * `planes` - Array of plane numbers indicating which plane to copy from
-    ///     the corresponding source frame.
+    ///   the corresponding source frame.
     ///
     /// * `propSrc` - A frame from which properties will be copied. Can be `NULL`.
     ///
@@ -1020,7 +1020,7 @@ pub struct VSAPI {
     /// * `format` - The desired audio format. Must not be `NULL`.
     ///
     /// * `numSamples` - The number of samples in the frame. All audio frames apart from
-    ///     the last one returned by a filter must have [`VS_AUDIO_FRAME_SAMPLES`].
+    ///   the last one returned by a filter must have [`VS_AUDIO_FRAME_SAMPLES`].
     ///
     /// * `propSrc` - A frame from which properties will be copied. Can be `NULL`.
     ///
@@ -1044,17 +1044,17 @@ pub struct VSAPI {
     /// * `format` - The desired audio format. Must not be `NULL`.
     ///
     /// * `numSamples` - The number of samples in the frame. All audio frames apart from
-    ///     the last one returned by a filter must have [`VS_AUDIO_FRAME_SAMPLES`].
+    ///   the last one returned by a filter must have [`VS_AUDIO_FRAME_SAMPLES`].
     ///
     /// * `propSrc` - A frame from which properties will be copied. Can be `NULL`.
     ///
     /// * `channelSrc` - Array of frames from which channels will be copied.
-    ///     If any elements of the array are `NULL`, the corresponding planes in
-    ///     the new frame will contain uninitialised memory.
+    ///   If any elements of the array are `NULL`, the corresponding planes in
+    ///   the new frame will contain uninitialised memory.
     ///
     /// * `channels` - Array of channel numbers indicating which channel to copy from
-    ///     the corresponding source frame.
-    ///     Note that the number refers to the nth channel and not a channel name constant.
+    ///   the corresponding source frame.
+    ///   Note that the number refers to the nth channel and not a channel name constant.
     ///
     /// Returns a pointer to the created frame.
     /// Ownership of the new frame is transferred to the caller.
@@ -1137,7 +1137,7 @@ pub struct VSAPI {
     ///
     /// * `format` - The input video format.
     /// * `buffer` - Destination buffer. At most 32 bytes including
-    ///     terminating `NUL` will be written.
+    ///   terminating `NUL` will be written.
     ///
     /// Returns non-zero on success.
     pub getVideoFormatName: unsafe extern "system-unwind" fn(
@@ -1150,7 +1150,7 @@ pub struct VSAPI {
     ///
     /// * `format` - The input audio format.
     /// * `buffer` - Destination buffer. At most 32 bytes including
-    ///     terminating `NUL` will be written.
+    ///   terminating `NUL` will be written.
     ///
     /// Returns non-zero on success.
     pub getAudioFormatName: unsafe extern "system-unwind" fn(
@@ -1166,16 +1166,16 @@ pub struct VSAPI {
     /// * `colorFamily` - One of [`VSColorFamily`].
     /// * `sampleType` - One of [`VSSampleType`].
     /// * `bitsPerSample` - Number of meaningful bits for a single component.
-    ///     The valid range is 8-32.
+    ///   The valid range is 8-32.
     ///
     ///     For floating point formats only 16 or 32 bits are allowed.
     /// * `subSamplingW` - log2 of the horizontal chroma subsampling.
-    ///     0 == no subsampling. The valid range is 0-4.
+    ///   0 == no subsampling. The valid range is 0-4.
     /// * `subSamplingH` - log2 of the vertical chroma subsampling.
-    ///     0 == no subsampling. The valid range is 0-4.
+    ///   0 == no subsampling. The valid range is 0-4.
     ///
     ///     ## Note
-    ///     
+    ///
     ///     RGB formats are not allowed to be subsampled in `VapourSynth`.
     ///
     /// Returns non-zero on success.
@@ -1198,13 +1198,13 @@ pub struct VSAPI {
     /// * `sampleType` - One of [`VSSampleType`].
     ///
     /// * `bitsPerSample` - Number of meaningful bits for a single component.
-    ///     The valid range is 8-32.
+    ///   The valid range is 8-32.
     ///
     ///     For floating point formats only 32 bits are allowed.
     ///
     /// * `channelLayout` - A bitmask constructed from bitshifted constants in
-    ///     [`VSAudioChannels`]. For example stereo is expressed as
-    ///     `(1 << acFrontLeft) | (1 << acFrontRight)`.
+    ///   [`VSAudioChannels`]. For example stereo is expressed as
+    ///   `(1 << acFrontLeft) | (1 << acFrontRight)`.
     ///
     /// Returns non-zero on success.
     pub queryAudioFormat: unsafe extern "system-unwind" fn(
@@ -1225,18 +1225,18 @@ pub struct VSAPI {
     /// * `sampleType` - One of [`VSSampleType`].
     ///
     /// * `bitsPerSample` - Number of meaningful bits for a single component.
-    ///     The valid range is 8-32.
+    ///   The valid range is 8-32.
     ///
     ///     For floating point formats only 16 or 32 bits are allowed.
     ///
     /// * `subSamplingW` - log2 of the horizontal chroma subsampling.
-    ///     0 == no subsampling. The valid range is 0-4.
+    ///   0 == no subsampling. The valid range is 0-4.
     ///
     /// * `subSamplingH` - log2 of the vertical chroma subsampling.
-    ///     0 == no subsampling. The valid range is 0-4.
+    ///   0 == no subsampling. The valid range is 0-4.
     ///
     ///     ## Note
-    ///     
+    ///
     ///     RGB formats are not allowed to be subsampled in `VapourSynth`.
     ///
     /// Returns a valid format id if the provided arguments are valid, on error 0 is returned.
@@ -1255,7 +1255,7 @@ pub struct VSAPI {
     /// * `format` - The struct to fill out.
     ///
     /// * `id` - The format identifier: one of [`VSPresetVideoFormat`]
-    ///     or a value gotten from [`queryVideoFormatID()`](Self::queryVideoFormatID).
+    ///   or a value gotten from [`queryVideoFormatID()`](Self::queryVideoFormatID).
     ///
     /// Returns 0 on failure and non-zero on success.
     pub getVideoFormatByID: unsafe extern "system-unwind" fn(
@@ -1280,10 +1280,10 @@ pub struct VSAPI {
     /// * `node` - The node from which the frame is requested.
     ///
     /// * `errorMsg` - Pointer to a buffer of `bufSize` bytes to store a possible error message.
-    ///     Can be `NULL` if no error message is wanted.
+    ///   Can be `NULL` if no error message is wanted.
     ///
     /// * `bufSize` - Maximum length for the error message, in bytes (including the trailing '0').
-    ///     Can be 0 if no error message is wanted.
+    ///   Can be 0 if no error message is wanted.
     ///
     /// Returns a reference to the generated frame, or `NULL` in case of failure.
     /// The ownership of the frame is transferred to the caller.
@@ -1519,13 +1519,13 @@ pub struct VSAPI {
     /// * `index` - Zero-based index of the element.
     ///
     ///     Use [`mapNumElements()`](Self::mapNumElements) to know the total number of elements
-    ///     associated with a key.
+    ///   associated with a key.
     ///
     /// * `error` - One of [`VSMapPropertyError`], [`VSMapPropertyError::Success`]
-    ///     on success.
+    ///   on success.
     ///
     ///     You may pass `NULL` here, but then any problems encountered while retrieving
-    ///     the property will cause `VapourSynth` to die with a fatal error.
+    ///   the property will cause `VapourSynth` to die with a fatal error.
     pub mapGetInt: unsafe extern "system-unwind" fn(
         map: *const VSMap,
         key: *const c_char,
@@ -1588,7 +1588,7 @@ pub struct VSAPI {
     /// * `i` - Pointer to the first element of the array to store.
     ///
     /// * `size` - Number of integers to read from the array. It can be 0, in which case
-    ///     no integers are read from the array, and the property will be created empty.
+    ///   no integers are read from the array, and the property will be created empty.
     ///
     /// Returns 0 on success, or 1 if size is negative.
     pub mapSetIntArray: unsafe extern "system-unwind" fn(
@@ -1657,8 +1657,8 @@ pub struct VSAPI {
     /// * `d` - Pointer to the first element of the array to store.
     ///
     /// * `size` - Number of floating point numbers to read from the array. It can be 0,
-    ///     in which case no numbers are read from the array,
-    ///     and the property will be created empty.
+    ///   in which case no numbers are read from the array,
+    ///   and the property will be created empty.
     ///
     /// Returns 0 on success, or 1 if size is negative.
     pub mapSetFloatArray: unsafe extern "system-unwind" fn(
@@ -1724,11 +1724,11 @@ pub struct VSAPI {
     /// * `data` - Value to store.
     ///
     ///     This function copies the data, so the pointer should be freed when no longer needed.
-    ///     A terminating `NULL` is always added to the copied data but not included in
-    ///     the total size to make string handling easier.
+    ///   A terminating `NULL` is always added to the copied data but not included in
+    ///   the total size to make string handling easier.
     ///
     /// * `size` - The number of bytes to copy. If this is negative,
-    ///     everything up to the first `NULL` byte will be copied.
+    ///   everything up to the first `NULL` byte will be copied.
     ///
     /// * `type` - One of [`VSDataTypeHint`] to hint whether or not it is human readable data.
     ///
@@ -1864,22 +1864,22 @@ pub struct VSAPI {
     /// # Arguments
     ///
     /// * `name` - Filter name. The characters allowed are letters, numbers, and the underscore.
-    ///     The first character must be a letter. In other words: ^[a-zA-Z][a-zA-Z0-9_]*$
+    ///   The first character must be a letter. In other words: ^[a-zA-Z][a-zA-Z0-9_]*$
     ///
     ///     Filter names _should be_ `PascalCase`.
     ///
     /// * `args` - String containing the filter's list of arguments.
     ///
     ///     Arguments are separated by a semicolon. Each argument is made of several fields
-    ///     separated by a colon. Don't insert additional whitespace characters,
-    ///     or `VapourSynth` will die.
+    ///   separated by a colon. Don't insert additional whitespace characters,
+    ///   or `VapourSynth` will die.
     ///
     ///     ## Fields:
     ///
     ///     * The argument name.
     ///
     ///         The same characters are allowed as for the filter's name.
-    ///         Argument names should be all lowercase and use only letters and the underscore.
+    ///       Argument names should be all lowercase and use only letters and the underscore.
     ///
     ///     * The type.
     ///
@@ -1905,8 +1905,8 @@ pub struct VSAPI {
     ///     * "any"
     ///
     ///         Can only be placed last without a semicolon after.
-    ///         Indicates that all remaining arguments that don't match
-    ///         should also be passed through.
+    ///       Indicates that all remaining arguments that don't match
+    ///       should also be passed through.
     ///
     ///     ## Example
     ///
@@ -1917,30 +1917,30 @@ pub struct VSAPI {
     ///     ```
     ///
     ///     The following example declares the arguments "blah" and accepts all other arguments
-    ///     no matter the type:
+    ///   no matter the type:
     ///
     ///     ```txt
     ///     blah:vnode;any
     ///     ```
     ///
     /// * `returnType` - Specifies works similarly to `args` but instead specifies which keys
-    ///     and what type will be returned. Typically this will be:
+    ///   and what type will be returned. Typically this will be:
     ///
     ///     ```txt
     ///     clip:vnode;
     ///     ```
     ///
     ///     for video filters. It is important to not simply specify "any" for all filters
-    ///     since this information is used for better auto-completion in many editors.
+    ///   since this information is used for better auto-completion in many editors.
     ///
     /// * `argsFunc` -  See [`VSPublicFunction`].
     ///
     /// * `functionData` - Pointer to user data that gets passed to `argsFunc`
-    ///     when creating a filter. Useful to register multiple filters using
-    ///     a single `argsFunc` function.
+    ///   when creating a filter. Useful to register multiple filters using
+    ///   a single `argsFunc` function.
     ///
     /// * `plugin` - Pointer to the plugin object in the core, as passed to
-    ///     `VapourSynthPluginInit2()`.
+    ///   `VapourSynthPluginInit2()`.
     pub registerFunction: unsafe extern "system-unwind" fn(
         name: *const c_char,
         args: *const c_char,
@@ -2070,7 +2070,7 @@ pub struct VSAPI {
     /// # Arguments
     ///
     /// * `flags` - [`VSCoreCreationFlags`] `ORed` together if desired.
-    ///    Pass 0 for sane defaults that should suit most uses.
+    ///   Pass 0 for sane defaults that should suit most uses.
     ///
     pub createCore: unsafe extern "system-unwind" fn(flags: c_int) -> *mut VSCore,
 
@@ -2109,7 +2109,7 @@ pub struct VSAPI {
     /// * `msgType` - The type of message. One of [`VSMessageType`].
     ///
     ///     If `msgType` is [`VSMessageType::Fatal`],
-    ///     `VapourSynth` will call `abort()` after delivering the message.
+    ///   `VapourSynth` will call `abort()` after delivering the message.
     ///
     /// * `msg` - The message.
     pub logMessage: unsafe extern "system-unwind" fn(
@@ -2127,7 +2127,7 @@ pub struct VSAPI {
     /// # Arguments
     ///
     /// * `handler` -  Custom message handler. If this is `NULL`,
-    ///     the default message handler will be restored.
+    ///   the default message handler will be restored.
     ///
     /// * `free` - Called when a handler is removed.
     ///

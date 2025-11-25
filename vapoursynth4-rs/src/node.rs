@@ -97,13 +97,11 @@ impl Node for VideoNode {
         self.api
     }
 
-    #[must_use]
     #[inline]
     fn as_ptr(&self) -> *mut ffi::VSNode {
         self.handle.cast_mut()
     }
 
-    #[must_use]
     fn get_frame_filter(&self, n: i32, ctx: &mut FrameContext) -> Self::FrameType {
         unsafe {
             VideoFrame::from_ptr(
@@ -190,7 +188,6 @@ impl Node for AudioNode {
         self.api
     }
 
-    #[must_use]
     #[inline]
     fn as_ptr(&self) -> *mut ffi::VSNode {
         self.handle.cast_mut()

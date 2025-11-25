@@ -2,7 +2,6 @@
 name = "vapoursynth4-rs"
 version = "0.4.0"
 edition = "2024"
-authors = ["Inflation <rust@kosmopho.dev>"]
 description = "A safe wrapper for VapourSynth and VSScript API version 4"
 license = "MPL-2.0"
 
@@ -11,14 +10,14 @@ repository = "https://github.com/inflation/vapoursynth4-rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bon = "3.3.0"
-thiserror = "2.0.0"
+bon = "3.8.1"
+thiserror = "2.0.17"
 vapoursynth4-sys = { version = "0.3.1", path = "../vapoursynth4-sys"}
 # vapoursynth4-rs-macros = { version = "0.1.0", path = "../vapoursynth4-rs-macros", optional = true}
 
 [dev-dependencies]
 const-str = "0.7.0"
-testresult = "0.4.0"
+testresult = "0.4.1"
 
 [features]
 link-library = ["vapoursynth4-sys/link-library"]

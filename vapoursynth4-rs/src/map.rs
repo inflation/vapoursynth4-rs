@@ -158,7 +158,7 @@ impl Map {
     ) -> Result<T, MapPropertyError> {
         let mut error = ffi::VSMapPropertyError::Success;
         handle_get_error(
-            unsafe { func(self.as_ptr(), key.as_ptr(), index, &mut error) },
+            unsafe { func(self.as_ptr(), key.as_ptr(), index, &raw mut error) },
             error,
         )
     }
@@ -281,7 +281,7 @@ impl Map {
     /// # Errors
     ///
     /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get(&self, key: &KeyStr, index: i32) -> Result<Value, MapPropertyError> {
+    pub fn get(&self, key: &KeyStr, index: i32) -> Result<Value<'_>, MapPropertyError> {
         use ffi::VSPropertyType as t;
 
         unsafe {
@@ -336,7 +336,7 @@ impl Map {
                 .num_elements(key)
                 .ok_or(MapPropertyError::KeyNotFound)?;
             let ptr = handle_get_error(
-                (self.api.mapGetIntArray)(self.as_ptr(), key.as_ptr(), &mut error),
+                (self.api.mapGetIntArray)(self.as_ptr(), key.as_ptr(), &raw mut error),
                 error,
             )?;
 
@@ -363,7 +363,7 @@ impl Map {
                 .num_elements(key)
                 .ok_or(MapPropertyError::KeyNotFound)?;
             let ptr = handle_get_error(
-                (self.api.mapGetFloatArray)(self.as_ptr(), key.as_ptr(), &mut error),
+                (self.api.mapGetFloatArray)(self.as_ptr(), key.as_ptr(), &raw mut error),
                 error,
             )?;
 

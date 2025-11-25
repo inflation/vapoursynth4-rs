@@ -54,7 +54,6 @@ impl Default for Api {
     /// # Panics
     ///
     /// Internal error indicates that something went wrong with the linked `VapourSynth` library.
-    #[must_use]
     fn default() -> Self {
         Self::new(ffi::VAPOURSYNTH_API_MAJOR, ffi::VAPOURSYNTH_API_MINOR).unwrap()
     }
@@ -99,7 +98,6 @@ impl Default for VssApi {
     /// # Panics
     ///
     /// Internal error indicates that something went wrong with the linked `VapourSynth` library.
-    #[must_use]
     fn default() -> Self {
         Self::new(ffi::VSSCRIPT_API_MAJOR, ffi::VSSCRIPT_API_MINOR).unwrap()
     }

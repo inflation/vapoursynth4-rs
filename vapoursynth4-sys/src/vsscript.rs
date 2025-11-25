@@ -90,7 +90,7 @@ pub struct VSSCRIPTAPI {
     /// * `buffer` - The entire script to evaluate, as a C string.
     ///
     /// * `scriptFilename` - A name for the script, which will be displayed in error messages.
-    ///     If this is `NULL`, the name "\<string\>" will be used.
+    ///   If this is `NULL`, the name "\<string\>" will be used.
     ///
     /// The special `__file__` variable will be set to `scriptFilename`'s absolute path
     /// if this is not `NULL`.

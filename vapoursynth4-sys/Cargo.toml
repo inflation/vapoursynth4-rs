@@ -1,24 +1,22 @@
 [package]
 name = "vapoursynth4-sys"
+version = "0.3.2+R73"
 edition = "2024"
-version = "0.3.1"
-authors = ["Inflation <rust@kosmopho.dev>"]
 description = "Rust bindings for VapourSynth and VSScript API version 4"
-license = "MPL-2.0"
-
-repository = "https://github.com/inflation/vapoursynth4-rs"
 documentation = "https://docs.rs/vapoursynth4-sys"
+repository = "https://github.com/inflation/vapoursynth4-rs"
+license = "MPL-2.0"
 keywords = ["vapoursynth", "vsscript", "video", "bindings"]
 categories = ["external-ffi-bindings", "multimedia::video"]
 
 [dependencies]
-cc = { version = "1.0.83", optional = true }
+cc = { version = "1.2.48", optional = true }
 
 [features]
 # Features for enabling higher API versions.
 vs-41 = []
 
-vsscript = []
+vsscript = [] # Base VSScript version is 4.1
 vsscript-42 = []
 
 # Experimental features.
@@ -27,7 +25,7 @@ vs-graph = []
 # Link the VapourSynth library
 link-library = []
 
-default = ["vs-41", "vsscript", "vsscript-42", "vs-graph"]
+default = ["vs-41", "vsscript", "vsscript-42"]
 
 [package.metadata.docs.rs]
 all-features = true
