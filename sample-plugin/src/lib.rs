@@ -147,7 +147,7 @@ mod tests {
         vss.evaluate_file(c"test.vpy")?;
         let node = vss.get_output(0)?;
         let OutputNode::Video(vn) = node else {
-            return Err("Expected video node".into());
+            panic!("Expected video node");
         };
         let _info = vn.info();
 

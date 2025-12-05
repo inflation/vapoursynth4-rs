@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 vapoursynth4-rs = { version = "0.4.0", path = "../vapoursynth4-rs", features = [
-  "link-library", # for tests
+  "link-vsscript", # for tests
 ] }
 
 

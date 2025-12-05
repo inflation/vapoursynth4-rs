@@ -4,7 +4,7 @@
  file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-//! # vapoursynth4-rs
+//! # `vapoursynth4-rs`
 //! A safe wrapper for `VapourSynth` API version 4.
 
 pub mod api;

@@ -4,6 +4,7 @@ set -euxo pipefail
 
 export PREFIX="$PWD/vapoursynth/build"
 export LIB_PATH="$PREFIX/lib"
+NPROC="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)"
 
 if [ ! -f "$LIB_PATH/libvapoursynth.so" ]; then
     git clone --depth 1 --branch R70 https://github.com/vapoursynth/vapoursynth || true
@@ -19,7 +20,7 @@ if [ ! -f "$LIB_PATH/libvapoursynth.so" ]; then
         pushd zimg
         ./autogen.sh
         ./configure --prefix="$PREFIX"
-        make -j"$(nproc)"
+        make -j"$NPROC"
         make install
         popd
     fi
@@ -30,7 +31,7 @@ if [ ! -f "$LIB_PATH/libvapoursynth.so" ]; then
     ./autogen.sh
     ./configure CFLAGS="-g -O0 -w -DVS_USE_LATEST_API -DVSSCRIPT_USE_LATEST_API" \
         CXXFLAGS="-g -O0 -w -DVS_USE_LATEST_API -DVSSCRIPT_USE_LATEST_API" --prefix="$PREFIX"
-    make -j"$(nproc)"
+    make -j"$NPROC"
     make install
     popd
 fi

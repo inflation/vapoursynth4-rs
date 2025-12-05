@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +32,7 @@ jobs:
         with:
           cache-directories: |
             vapoursynth/
+            vapoursynth-portable/
       - name: Set script path
         id: build-scripts
         shell: bash
@@ -47,6 +48,11 @@ jobs:
         uses: taiki-e/install-action@nextest
       - name: Build
         run: cargo build --all-features --workspace
+      - name: Test
+        if: matrix.os == 'windows-latest'
+        run: |
+          echo $env:VAPOURSYNTH_LIB_PATH
+          echo $env:PATH
       - name: Tests
         run: cargo nextest run --all-features --workspace
 

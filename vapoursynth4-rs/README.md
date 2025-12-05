@@ -18,13 +18,13 @@ their work on the original bindings.
 [6]: https://github.com/vapoursynth/vapoursynth
 [7]: https://github.com/YaLTeR/vapoursynth-rs
 
-Check out [vapoursynth4-sys](https://crates.io/crates/vapoursynth4-sys) for the raw binding.
+Check out [`vapoursynth4-sys`](https://crates.io/crates/vapoursynth4-sys) for the raw binding.
 
 ## Supported Versions
 
-All VapourSynth and VSScript API versions starting with 4.0 are supported.
-By default, the crates use the latest API version available.  To use a specific version,
-disable the default feature and enable the corresponding Cargo feature:
+All VapourSynth and VSScript API versions starting with 4.0 are supported. By
+default, the crates use the latest API version available. To use a specific
+version, disable the default feature and enable the corresponding Cargo feature:
 
 - `vs-41` for VapourSynth API 4.1 (R66)
 - `vsscript` for VSScript API 4.0
@@ -32,13 +32,14 @@ disable the default feature and enable the corresponding Cargo feature:
 
 ## Building
 
-Make sure you have the corresponding libraries available if you enable the linking features.
-You can use the `VAPOURSYNTH_LIB_DIR` environment variable to specify
-a custom directory with the library files.
+Make sure you have the corresponding libraries available if you enable the
+linking features. You can use the `VAPOURSYNTH_LIB_DIR` environment variable to
+specify a custom directory with the library files.
 
-On Windows the easiest way is to use the VapourSynth installer (make sure the VapourSynth SDK
-is checked). Set `VAPOURSYNTH_LIB_DIR` to `<path to the VapourSynth installation>\sdk\lib64`
-or `<...>\lib32`, depending on the target.
+On Windows the easiest way is to use the VapourSynth installer (make sure the
+VapourSynth SDK is checked). Set `VAPOURSYNTH_LIB_DIR` to
+`<path to the VapourSynth installation>\sdk\lib64` or `<...>\lib32`, depending
+on the target.
 
 ## License
 

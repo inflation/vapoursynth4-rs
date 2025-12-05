@@ -565,7 +565,7 @@ impl Clone for Map {
     }
 }
 
-#[cfg(feature = "link-library")]
+#[cfg(feature = "link-vs")]
 impl Default for Map {
     fn default() -> Self {
         unsafe {
@@ -636,7 +636,7 @@ pub type AppendMode = ffi::VSMapAppendMode;
 // MARK: Tests
 
 #[cfg(test)]
-#[cfg(feature = "link-library")]
+#[cfg(feature = "link-vs")]
 mod tests {
     use core::panic;
 
