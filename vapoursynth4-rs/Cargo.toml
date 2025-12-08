@@ -20,7 +20,13 @@ const-str = "0.7.0"
 testresult = "0.4.1"
 
 [features]
+default = ["vs-41", "vsscript", "vsscript-42"]
 link-library = ["vapoursynth4-sys/link-library"]
+vs-41 = ["vapoursynth4-sys/vs-41"]
+vsscript = ["vapoursynth4-sys/vsscript"]
+vsscript-42 = ["vapoursynth4-sys/vsscript-42"]
+vs-graph = ["vapoursynth4-sys/vs-graph"]
+
 # default = ["macros"]
 # macros = ["vapoursynth4-rs-macros"]
 
