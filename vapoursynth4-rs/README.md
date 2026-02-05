@@ -26,9 +26,9 @@ All VapourSynth and VSScript API versions starting with 4.0 are supported.
 By default, the crates use the latest API version available.  To use a specific version,
 disable the default feature and enable the corresponding Cargo feature:
 
-- `vapoursynth-api-40` for VapourSynth API 4.0 (R55)
-- `vsscript-api-40` for VSScript API 4.0
-- `vsscript-api-41` for VSScript API 4.1
+- `vs-41` for VapourSynth API 4.1 (R66)
+- `vsscript` for VSScript API 4.0
+- `vsscript-42` for VSScript API 4.1
 
 ## Building
 

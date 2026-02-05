@@ -25,7 +25,7 @@ vs-graph = []
 # Link the VapourSynth library
 link-library = []
 
-default = ["vs-41", "vsscript", "vsscript-42"]
+default = []
 
 [package.metadata.docs.rs]
 all-features = true
