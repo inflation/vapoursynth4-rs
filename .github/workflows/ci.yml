@@ -48,11 +48,6 @@ jobs:
         uses: taiki-e/install-action@nextest
       - name: Build
         run: cargo build --all-features --workspace
-      - name: Test
-        if: matrix.os == 'windows-latest'
-        run: |
-          echo $env:VAPOURSYNTH_LIB_PATH
-          echo $env:PATH
       - name: Tests
         run: cargo nextest run --all-features --workspace
 

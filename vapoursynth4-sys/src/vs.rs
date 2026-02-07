@@ -2206,7 +2206,7 @@ pub struct VSAPI {
 }
 
 #[cfg(feature = "link-vs")]
-#[link(name = "vapoursynth", kind = "static")]
+#[link(name = "vapoursynth")]
 unsafe extern "system-unwind" {
     /// Returns a pointer to the global [`VSAPI`] instance.
     ///

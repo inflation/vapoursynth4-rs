@@ -30,7 +30,7 @@ if [ ! -f "$LIB_PATH/libvapoursynth.so" ]; then
     export PKG_CONFIG_PATH="$LIB_PATH/pkgconfig"
     ./autogen.sh
     ./configure CFLAGS="-g -O0 -w -DVS_USE_LATEST_API -DVSSCRIPT_USE_LATEST_API" \
-        CXXFLAGS="-g -O0 -w -DVS_USE_LATEST_API -DVSSCRIPT_USE_LATEST_API" --prefix="$PREFIX"
+        CXXFLAGS="-g -O0 -fPIC -w -DVS_USE_LATEST_API -DVSSCRIPT_USE_LATEST_API" --prefix="$PREFIX"
     make -j"$NPROC"
     make install
     popd
