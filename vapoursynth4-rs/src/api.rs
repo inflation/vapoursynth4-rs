@@ -6,12 +6,10 @@
 
 use std::ops::Deref;
 
-#[cfg(feature = "link-library")]
 use vapoursynth4_sys::vs_make_version;
 
 use crate::ffi;
 
-#[cfg(feature = "link-library")]
 use self::error::ApiNotFound;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -24,7 +22,7 @@ impl Api {
     /// # Errors
     ///
     /// Returns `ApiNotFound` if the requested API version is not supported by the linked `VapourSynth` library.
-    #[cfg(feature = "link-library")]
+    #[cfg(feature = "link-vs")]
     pub fn new(major: u16, minor: u16) -> Result<Self, ApiNotFound> {
         let ptr = unsafe { ffi::getVapourSynthAPI(vs_make_version(major, minor)) };
         if ptr.is_null() {
@@ -47,7 +45,7 @@ impl Deref for Api {
     }
 }
 
-#[cfg(feature = "link-library")]
+#[cfg(feature = "link-vs")]
 impl Default for Api {
     /// Creates a new `Api` instance with the default version.
     ///
@@ -69,7 +67,7 @@ impl VssApi {
     /// # Errors
     ///
     /// Returns `ApiNotFound` if the requested API version is not supported by the linked `VapourSynth` library.
-    #[cfg(feature = "link-library")]
+    #[cfg(feature = "link-vsscript")]
     pub fn new(major: u16, minor: u16) -> Result<Self, ApiNotFound> {
         let ptr = unsafe { ffi::getVSScriptAPI(vs_make_version(major, minor)) };
         (!ptr.is_null())
@@ -91,7 +89,7 @@ impl Deref for VssApi {
     }
 }
 
-#[cfg(feature = "link-library")]
+#[cfg(feature = "link-vsscript")]
 impl Default for VssApi {
     /// Creates a new `Api` instance with the default version.
     ///

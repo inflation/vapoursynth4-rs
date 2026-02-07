@@ -1,5 +1,6 @@
 /target
 vapoursynth/
+vapoursynth-portable/
 .vscode/
 .cargo/
 .idea/

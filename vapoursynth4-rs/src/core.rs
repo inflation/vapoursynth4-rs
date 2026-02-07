@@ -424,10 +424,10 @@ impl Core {
         #[builder(field)] flags: i32,
         max_cache_size: Option<i64>,
         thread_count: Option<i32>,
-        #[cfg(feature = "link-library")]
+        #[cfg(feature = "link-vs")]
         #[builder(default)]
         api: Api,
-        #[cfg(not(feature = "link-library"))] api: Api,
+        #[cfg(not(feature = "link-vs"))] api: Api,
     ) -> Self {
         let mut core = unsafe { Core::new_with(flags, api) };
         if let Some(size) = max_cache_size {
@@ -459,7 +459,7 @@ impl<S: State> CoreBuilder<S> {
 }
 
 #[cfg(test)]
-#[cfg(feature = "link-library")]
+#[cfg(feature = "link-vs")]
 mod tests {
     use super::*;
 

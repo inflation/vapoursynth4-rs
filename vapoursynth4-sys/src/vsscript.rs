@@ -225,7 +225,7 @@ pub struct VSSCRIPTAPI {
     ) -> c_int,
 }
 
-#[cfg(feature = "link-library")]
+#[cfg(feature = "link-vsscript")]
 #[cfg_attr(target_os = "windows", link(name = "VSScript"))]
 #[cfg_attr(not(target_os = "windows"), link(name = "vapoursynth-script"))]
 unsafe extern "system-unwind" {

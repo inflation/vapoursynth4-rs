@@ -4,6 +4,7 @@ use std::{
 };
 
 use thiserror::Error;
+use vapoursynth4_sys::VAPOURSYNTH_API_VERSION;
 
 use crate::{
     api::{Api, VssApi},
@@ -32,10 +33,13 @@ impl Script {
     /// # Panics
     ///
     /// Panics if the script creation fails.
-    pub fn new(core: Option<&Core>, vssapi: VssApi, api: Api) -> Self {
+    pub fn new(core: Option<&Core>, vssapi: VssApi) -> Self {
         unsafe {
             let handle = NonNull::new((vssapi.createScript)(core.map_or(null_mut(), Core::as_ptr)))
                 .expect("Failed to create script");
+            let api_ptr = (vssapi.getVSAPI)(VAPOURSYNTH_API_VERSION);
+            assert!(!api_ptr.is_null());
+            let api = Api::from_ptr(api_ptr);
             Self {
                 handle,
                 vssapi,
@@ -136,10 +140,10 @@ impl Drop for Script {
     }
 }
 
-#[cfg(feature = "link-library")]
+#[cfg(feature = "link-vsscript")]
 impl Default for Script {
     fn default() -> Self {
-        Self::new(None, VssApi::default(), Api::default())
+        Self::new(None, VssApi::default())
     }
 }
 

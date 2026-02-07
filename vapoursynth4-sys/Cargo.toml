@@ -22,8 +22,10 @@ vsscript-42 = []
 # Experimental features.
 vs-graph = []
 
-# Link the VapourSynth library
-link-library = []
+# Link the VS library
+link-vs = []
+# Link the VSScript library
+link-vsscript = []
 
 default = []
 
