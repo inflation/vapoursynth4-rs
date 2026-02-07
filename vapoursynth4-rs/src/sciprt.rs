@@ -27,6 +27,26 @@ pub enum OutputNode {
     Video(VideoNode),
 }
 
+impl OutputNode {
+    #[must_use]
+    pub fn as_audio(&self) -> Option<&AudioNode> {
+        if let OutputNode::Audio(node) = self {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    #[must_use]
+    pub fn as_video(&self) -> Option<&VideoNode> {
+        if let OutputNode::Video(node) = self {
+            Some(node)
+        } else {
+            None
+        }
+    }
+}
+
 impl Script {
     /// Creates a new script instance.
     ///

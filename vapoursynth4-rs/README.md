@@ -19,12 +19,14 @@ their work on the original bindings.
 [7]: https://github.com/YaLTeR/vapoursynth-rs
 
 Check out [`vapoursynth4-sys`](https://crates.io/crates/vapoursynth4-sys) for the raw binding.
+Check out [`vapoursynth4-sys`](https://crates.io/crates/vapoursynth4-sys) for the raw binding.
 
 ## Supported Versions
 
-All VapourSynth and VSScript API versions starting with 4.0 are supported. By
-default, the crates use the latest API version available. To use a specific
-version, disable the default feature and enable the corresponding Cargo feature:
+All VapourSynth and VSScript API versions starting with 4.0 are supported.
+By default, the crates use the latest API version available.
+To use a specific version,
+disable the default feature and enable the corresponding Cargo feature:
 
 - `vs-41` for VapourSynth API 4.1 (R66)
 - `vsscript` for VSScript API 4.0

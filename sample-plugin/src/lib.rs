@@ -85,7 +85,7 @@ impl Filter for DumbFilter {
             r::AllFramesReady => {
                 let src = self.node.get_frame_filter(n, &mut ctx);
                 if !self.enabled {
-                    panic!("Not enabled");
+                    return Err(c"Not enabled");
                 }
 
                 let fi = src.get_video_format();
@@ -139,16 +139,14 @@ declare_plugin!(
 #[cfg(test)]
 mod tests {
     use testresult::TestResult;
-    use vapoursynth4_rs::sciprt::{OutputNode, Script};
+    use vapoursynth4_rs::sciprt::Script;
 
     #[test]
     fn test_vsscript_works() -> TestResult {
         let vss = Script::default();
         vss.evaluate_file(c"test.vpy")?;
         let node = vss.get_output(0)?;
-        let OutputNode::Video(vn) = node else {
-            panic!("Expected video node");
-        };
+        let vn = node.as_video().ok_or("Expected video node")?;
         let _info = vn.info();
 
         Ok(())

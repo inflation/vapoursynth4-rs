@@ -12,12 +12,13 @@ their work on the original bindings.
 [3]: https://github.com/vapoursynth/vapoursynth
 [4]: https://github.com/YaLTeR/vapoursynth-rs
 
-Check out [vapoursynth4-rs](https://crates.io/crates/vapoursynth4-rs) for a safe Rust wrapper.
+Check out [`vapoursynth4-rs`](https://crates.io/crates/vapoursynth4-rs) for a safe Rust wrapper.
 
 ## Supported Versions
 
 All VapourSynth and VSScript API versions starting with 4.0 are supported.
-By default, the crates use the VapourSynth API 4.0 API.  To use a specific version, enable the corresponding Cargo feature:
+By default, the crates use the VapourSynth API 4.0 API.
+To use a specific version, enable the corresponding Cargo feature:
 
 - `vs-41` for VapourSynth API 4.1 (R66)
 - `vsscript` for VSScript API 4.0
