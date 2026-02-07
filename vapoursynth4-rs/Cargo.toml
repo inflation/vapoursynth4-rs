@@ -1,6 +1,6 @@
 [package]
 name = "vapoursynth4-rs"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 description = "A safe wrapper for VapourSynth and VSScript API version 4"
 license = "MPL-2.0"
@@ -12,7 +12,7 @@ repository = "https://github.com/inflation/vapoursynth4-rs"
 [dependencies]
 bon = "3.8.2"
 thiserror = "2.0.18"
-vapoursynth4-sys = { version = "0.3.2", path = "../vapoursynth4-sys"}
+vapoursynth4-sys = { version = "0.4.0", path = "../vapoursynth4-sys"}
 
 [dev-dependencies]
 const-str = "1.1.0"
