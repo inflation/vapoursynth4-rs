@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.4.0+R73](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.3.2+R73...vapoursynth4-sys-v0.4.0+R73)
+
+### 🐛 Bug Fixes
+
+- Clippy - ([ae1ae21](https://github.com/inflation/vapoursynth4-rs/commit/ae1ae21d292f9c8531afcedfc0aa56dda4050523))
+
+
 ## [0.3.1](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.3.0...vapoursynth4-sys-v0.3.1)
 
 ### 🚜 Refactor
