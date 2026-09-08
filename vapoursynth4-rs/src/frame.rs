@@ -105,12 +105,6 @@ impl VideoFrame {
     }
 
     #[must_use]
-    pub fn get_audio_format(&self) -> &AudioFormat {
-        // safety: `af` is valid if the node is an audio node
-        unsafe { &*(self.api.getAudioFrameFormat)(self.as_ptr()) }
-    }
-
-    #[must_use]
     pub fn get_type(&self) -> MediaType {
         unsafe { (self.api.getFrameType)(self.as_ptr()) }
     }
@@ -165,6 +159,12 @@ impl AudioFrame {
     #[must_use]
     pub fn channel_mut(&mut self, channel: i32) -> *mut u8 {
         unsafe { (self.api.getWritePtr)(self.as_ptr(), channel) }
+    }
+
+    /// Returns the format of this audio frame.
+    #[must_use]
+    pub fn get_audio_format(&self) -> &AudioFormat {
+        unsafe { &*(self.api.getAudioFrameFormat)(self.as_ptr()) }
     }
 
     #[must_use]
