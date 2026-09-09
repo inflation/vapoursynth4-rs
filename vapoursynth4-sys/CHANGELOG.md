@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.4.2+R79](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.4.1+R79...vapoursynth4-sys-v0.4.2+R79)
+
+### 🐛 Bug Fixes
+
+- Remove unneccessary renames - ([3cd14fe](https://github.com/inflation/vapoursynth4-rs/commit/3cd14fe5ddaed696d1758c48428487333307fe52))
+
+
 ## [0.4.1+R79]
 
 Tracks `VapourSynth` R79, adding VapourSynth API 4.2 and VSScript API 4.3.
