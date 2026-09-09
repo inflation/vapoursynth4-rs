@@ -29,21 +29,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache
         uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
         with:
-          cache-directories: |
-            vapoursynth/
-            vapoursynth-portable/
-      - name: Set script path
-        id: build-scripts
+          python-version: '3.13'
+      - name: Install VapourSynth
         shell: bash
-        run: |
-          if [ ${{ matrix.os }} == 'windows-latest' ]; then
-            echo "BUILD_SCRIPT=scripts/build-vs.ps1" >> "$GITHUB_OUTPUT"
-          else
-            echo "BUILD_SCRIPT=scripts/build-vs.sh" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Build VapourSynth in debug mode
-        run: ${{ steps.build-scripts.outputs.BUILD_SCRIPT }}
+        run: scripts/install-vs.sh
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Build
@@ -63,11 +54,11 @@ jobs:
           components: llvm-tools
       - name: Cache
         uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
         with:
-          cache-directories: |
-            vapoursynth/
-      - name: Build VapourSynth in debug mode
-        run: scripts/build-vs.sh
+          python-version: '3.13'
+      - name: Install VapourSynth
+        run: scripts/install-vs.sh
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Install cargo-nextest
@@ -79,8 +70,6 @@ jobs:
           --all-features --workspace
           --ignore-filename-regex vapoursynth4-sys/
           --lcov --output-path lcov.info
-        env:
-          VAPOURSYNTH_LIB_PATH: vapoursynth/build/lib
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
