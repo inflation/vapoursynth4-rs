@@ -30,12 +30,18 @@
 
 #![cfg(feature = "vsscript")]
 
-use std::ffi::{c_char, c_int, c_void};
+use std::ffi::{c_char, c_int};
 
 use super::{VSAPI, VSCore, VSMap, VSNode, opaque_struct, vs_make_version};
 
 pub const VSSCRIPT_API_MAJOR: u16 = 4;
-pub const VSSCRIPT_API_MINOR: u16 = if cfg!(feature = "vsscript-42") { 2 } else { 1 };
+pub const VSSCRIPT_API_MINOR: u16 = if cfg!(feature = "vsscript-43") {
+    3
+} else if cfg!(feature = "vsscript-42") {
+    2
+} else {
+    1
+};
 pub const VSSCRIPT_API_VERSION: i32 = vs_make_version(VSSCRIPT_API_MAJOR, VSSCRIPT_API_MINOR);
 
 opaque_struct!(
@@ -168,7 +174,7 @@ pub struct VSSCRIPTAPI {
     /// * `vars` - Map containing the variables to set.
     ///
     /// Returns non-zero on error.
-    pub setVariable:
+    pub setVariables:
         unsafe extern "system-unwind" fn(handle: *mut VSScript, vars: *const VSMap) -> c_int,
 
     /// Retrieves a node from the script environment. A node in the script must have been
@@ -208,12 +214,11 @@ pub struct VSSCRIPTAPI {
     ///   have been freed (frames, nodes, etc).
     ///
     /// It is safe to pass `NULL`.
-    pub freeScript: unsafe extern "system-unwind" fn(handle: *mut VSScript) -> c_int,
+    pub freeScript: unsafe extern "system-unwind" fn(handle: *mut VSScript),
 
     /// Set whether or not the working directory is temporarily changed to the same location
     /// as the script file when [`evaluateFile()`](Self::evaluateFile) is called. Off by default.
-    pub evalSetWorkingDir:
-        unsafe extern "system-unwind" fn(handle: *mut VSScript, setCWD: c_int) -> c_void,
+    pub evalSetWorkingDir: unsafe extern "system-unwind" fn(handle: *mut VSScript, setCWD: c_int),
 
     /// Write a list of set output index values to dst but at most size values.
     /// Always returns the total number of available output index values.
@@ -225,13 +230,20 @@ pub struct VSSCRIPTAPI {
     ) -> c_int,
 }
 
+// Since R74 no `VapourSynth` distribution ships an import library, so Windows
+// binds the DLL directly by name instead of going through one.
 #[cfg(feature = "link-vsscript")]
-#[cfg_attr(target_os = "windows", link(name = "VSScript"))]
-#[cfg_attr(not(target_os = "windows"), link(name = "vapoursynth-script"))]
+#[cfg_attr(windows, link(name = "vsscript", kind = "raw-dylib"))]
+#[cfg_attr(not(windows), link(name = "vapoursynth-script"))]
 unsafe extern "system-unwind" {
     /// Returns a struct containing function pointer for the api.
     /// Will return `NULL` is the specified version isn’t supported.
     ///
     /// It is recommended to always pass [`VSSCRIPT_API_VERSION`].
     pub fn getVSScriptAPI(version: c_int) -> *const VSSCRIPTAPI;
+
+    /// Returns the error message from the last [`getVSScriptAPI()`] failure,
+    /// or an empty string on success.
+    #[cfg(feature = "vsscript-43")]
+    pub fn getVSScriptAPILastError() -> *const c_char;
 }

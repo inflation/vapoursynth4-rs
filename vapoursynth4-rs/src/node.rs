@@ -77,6 +77,63 @@ pub trait Node: Sized + Send + Sync + crate::_private::Sealed {
             (self.api().getFrameAsync)(n, self.as_ptr(), callback, data);
         }
     }
+
+    /// Name of the function that created this filter.
+    ///
+    /// `level` 0 is the creating function itself; higher levels walk up to the
+    /// function that invoked it. Returns [`None`] for a non-existent level.
+    ///
+    /// Only meaningful on a core built with
+    /// [`enable_graph_inspection()`](crate::core::CoreBuilder::enable_graph_inspection),
+    /// and not safe to call concurrently with frame requests.
+    #[cfg(feature = "vs-graph")]
+    #[must_use]
+    fn creation_function_name(&self, level: i32) -> Option<&CStr> {
+        unsafe {
+            to_cstr((self.api().getNodeCreationFunctionName)(
+                self.as_ptr(),
+                level,
+            ))
+        }
+    }
+
+    /// Identifier of the plugin that created this filter.
+    ///
+    /// See [`creation_function_name()`](Self::creation_function_name) for `level`
+    /// and for the constraints on when this may be called.
+    #[cfg(feature = "vs-graph")]
+    #[must_use]
+    fn creation_plugin_id(&self, level: i32) -> Option<&CStr> {
+        unsafe { to_cstr((self.api().getNodeCreationPluginID)(self.as_ptr(), level)) }
+    }
+
+    /// Namespace of the plugin that created this filter.
+    ///
+    /// See [`creation_function_name()`](Self::creation_function_name) for `level`
+    /// and for the constraints on when this may be called.
+    #[cfg(feature = "vs-graph")]
+    #[must_use]
+    fn creation_plugin_namespace(&self, level: i32) -> Option<&CStr> {
+        unsafe { to_cstr((self.api().getNodeCreationPluginNS)(self.as_ptr(), level)) }
+    }
+
+    /// Arguments passed to the function that created this filter.
+    ///
+    /// See [`creation_function_name()`](Self::creation_function_name) for `level`
+    /// and for the constraints on when this may be called.
+    #[cfg(feature = "vs-graph")]
+    #[must_use]
+    fn creation_function_arguments(&self, level: i32) -> Option<crate::map::MapRef<'_>> {
+        let ptr = unsafe { (self.api().getNodeCreationFunctionArguments)(self.as_ptr(), level) };
+        (!ptr.is_null()).then(|| unsafe { crate::map::MapRef::from_ptr(ptr, self.api()) })
+    }
+}
+
+/// The graph inspection functions return strings owned by the node, so the
+/// result borrows from `self` rather than being copied out.
+#[cfg(feature = "vs-graph")]
+unsafe fn to_cstr<'a>(ptr: *const std::ffi::c_char) -> Option<&'a CStr> {
+    (!ptr.is_null()).then(|| unsafe { CStr::from_ptr(ptr) })
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]

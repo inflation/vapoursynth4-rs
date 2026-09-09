@@ -79,6 +79,21 @@ impl VssApi {
     pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSSCRIPTAPI) -> Self {
         Self(ptr.cast_mut())
     }
+
+    /// Detailed message explaining why the most recent [`VssApi::new()`] failed,
+    /// or [`None`] if it succeeded.
+    ///
+    /// [`ApiNotFound`] only reports the version that was asked for; this reports
+    /// what actually went wrong, typically a failure to locate or load Python.
+    ///
+    /// The message is copied out because the library keeps it in a static buffer
+    /// that the next `VssApi::new()` call overwrites.
+    #[cfg(all(feature = "link-vsscript", feature = "vsscript-43"))]
+    #[must_use]
+    pub fn last_error() -> Option<std::ffi::CString> {
+        let ptr = unsafe { ffi::getVSScriptAPILastError() };
+        (!ptr.is_null()).then(|| unsafe { std::ffi::CStr::from_ptr(ptr) }.to_owned())
+    }
 }
 
 impl Deref for VssApi {

@@ -25,6 +25,8 @@ mod _private {
 
 pub type ColorFamily = ffi::VSColorFamily;
 pub type SampleType = ffi::VSSampleType;
+/// Numbering of the `_Range` frame property. See [`ffi::VSRange`].
+pub type Range = ffi::VSRange;
 
 pub type VideoInfo = ffi::VSVideoInfo;
 pub type AudioInfo = ffi::VSAudioInfo;

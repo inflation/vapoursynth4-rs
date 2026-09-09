@@ -99,6 +99,18 @@ impl Core {
         }
     }
 
+    /// Same as [`get_info()`](Self::get_info), but also reports the
+    /// [`ffi::VSCoreCreationFlags`] the core was created with.
+    #[cfg(feature = "vs-42")]
+    #[must_use]
+    pub fn get_info2(&self) -> ffi::VSCoreInfo2 {
+        unsafe {
+            let mut info = MaybeUninit::uninit();
+            (self.api.getCoreInfo2)(self.as_ptr(), info.as_mut_ptr());
+            info.assume_init()
+        }
+    }
+
     /// # Panics
     ///
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
@@ -456,6 +468,13 @@ impl<S: State> CoreBuilder<S> {
         self.flags |= ffi::VSCoreCreationFlags::DisableLibraryUnloading as i32;
         self
     }
+
+    /// Log a list of all allocated frames after every completed external frame request.
+    #[cfg(feature = "vs-42")]
+    pub fn enable_frame_ref_debug(mut self) -> Self {
+        self.flags |= ffi::VSCoreCreationFlags::EnableFrameRefDebug as i32;
+        self
+    }
 }
 
 #[cfg(test)]
@@ -476,5 +495,21 @@ mod tests {
             .build();
         assert_eq!(core.get_info().max_framebuffer_size, 1024);
         assert_eq!(core.get_info().num_threads, 4);
+    }
+
+    #[cfg(feature = "vs-42")]
+    #[test]
+    fn info2_reports_creation_flags() {
+        let core = Core::builder()
+            .api(Api::default())
+            .enable_graph_inspection()
+            .disable_auto_loading()
+            .build();
+
+        let info = core.get_info2();
+        let expected = ffi::VSCoreCreationFlags::EnableGraphInspection
+            | ffi::VSCoreCreationFlags::DisableAutoLoading;
+        assert_eq!(info.creation_flags, expected);
+        assert_eq!(info.core, core.get_info().core);
     }
 }

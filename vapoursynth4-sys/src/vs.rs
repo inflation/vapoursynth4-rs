@@ -18,7 +18,13 @@ use super::{opaque_struct, vs_make_version};
 pub const VAPOURSYNTH_API_MAJOR: u16 = 4;
 /// Minor API version. It is bumped when new functions are added to [`VSAPI`]
 /// or core behavior is noticeably changed.
-pub const VAPOURSYNTH_API_MINOR: u16 = if cfg!(feature = "vs-41") { 1 } else { 0 };
+pub const VAPOURSYNTH_API_MINOR: u16 = if cfg!(feature = "vs-42") {
+    2
+} else if cfg!(feature = "vs-41") {
+    1
+} else {
+    0
+};
 /// API version. The high 16 bits are [`VAPOURSYNTH_API_MAJOR`], the low 16 bits are
 /// [`VAPOURSYNTH_API_MINOR`].
 pub const VAPOURSYNTH_API_VERSION: i32 =
@@ -195,9 +201,20 @@ pub enum VSPresetVideoFormat {
     YUV422P14 = vs_make_video_id(YUV, Integer, 14, 1, 0),
     YUV444P14 = vs_make_video_id(YUV, Integer, 14, 0, 0),
 
+    YUV410P16 = vs_make_video_id(YUV, Integer, 16, 2, 2),
+    YUV411P16 = vs_make_video_id(YUV, Integer, 16, 2, 0),
+    YUV440P16 = vs_make_video_id(YUV, Integer, 16, 0, 1),
+
     YUV420P16 = vs_make_video_id(YUV, Integer, 16, 1, 1),
     YUV422P16 = vs_make_video_id(YUV, Integer, 16, 1, 0),
     YUV444P16 = vs_make_video_id(YUV, Integer, 16, 0, 0),
+
+    YUV410PH = vs_make_video_id(YUV, Float, 16, 2, 2),
+    YUV410PS = vs_make_video_id(YUV, Float, 32, 2, 2),
+    YUV411PH = vs_make_video_id(YUV, Float, 16, 2, 0),
+    YUV411PS = vs_make_video_id(YUV, Float, 32, 2, 0),
+    YUV440PH = vs_make_video_id(YUV, Float, 16, 0, 1),
+    YUV440PS = vs_make_video_id(YUV, Float, 32, 0, 1),
 
     YUV420PH = vs_make_video_id(YUV, Float, 16, 1, 1),
     YUV420PS = vs_make_video_id(YUV, Float, 32, 1, 1),
@@ -406,6 +423,31 @@ pub struct VSCoreInfo {
     pub used_framebuffer_size: i64,
 }
 
+/// Contains information about a [`VSCore`] instance.
+///
+/// Same as [`VSCoreInfo`], plus the flags the core was created with. Added in API 4.2.
+#[cfg(feature = "vs-42")]
+#[repr(C)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub struct VSCoreInfo2 {
+    /// Printable string containing the name of the library, copyright notice,
+    /// core and API versions.
+    pub version_string: *const c_char,
+    /// Version of the core.
+    pub core: c_int,
+    /// Version of the API.
+    pub api: c_int,
+    /// The [`VSCoreCreationFlags`] the core was created with.
+    pub creation_flags: c_int,
+    /// Number of worker threads.
+    pub num_threads: c_int,
+    /// The framebuffer cache will be allowed to grow up to this size (bytes)
+    /// before memory is aggressively reclaimed.
+    pub max_framebuffer_size: i64,
+    /// Current size of the framebuffer cache, in bytes.
+    pub used_framebuffer_size: i64,
+}
+
 /// Contains information about a clip.
 #[repr(C)]
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -480,6 +522,9 @@ pub enum VSCoreCreationFlags {
     /// (windows feature, not my fault) of a library,
     /// this may help in applications with extreme amount of script reloading.
     DisableLibraryUnloading = 4,
+    /// Outputs a list of all allocated frames as a log message
+    /// after every external frame request has been completed.
+    EnableFrameRefDebug = 8,
 }
 
 impl std::ops::BitOr for VSCoreCreationFlags {
@@ -536,6 +581,10 @@ pub enum VSRequestPattern {
     /// Lut, Expr (conditionally, see [`VSRequestPattern::General`] note)
     /// and similar.
     StrictSpatial = 2,
+    /// Basically identical to [`VSRequestPattern::NoFrameReuse`] except that it hints
+    /// the last frame may be requested multiple times. Added in API 4.1.
+    #[cfg(feature = "vs-41")]
+    FrameReuseLastOnly = 3,
 }
 
 /// Describes how the output of a node is cached.
@@ -2169,20 +2218,32 @@ pub struct VSAPI {
     #[cfg(feature = "vs-41")]
     pub getNumNodeDependencies: unsafe extern "system-unwind" fn(node: *mut VSNode) -> c_int,
     #[cfg(feature = "vs-41")]
-    pub getNodeDependencies:
-        unsafe extern "system-unwind" fn(node: *mut VSNode) -> *const VSFilterDependency,
+    pub getNodeDependency: unsafe extern "system-unwind" fn(
+        node: *mut VSNode,
+        index: c_int,
+    ) -> *const VSFilterDependency,
 
     /* Node timing functions */
     /// non-zero when filter timing is enabled
+    #[cfg(feature = "vs-41")]
     pub getCoreNodeTiming: unsafe extern "system-unwind" fn(core: *mut VSCore) -> c_int,
     /// non-zero enables filter timing, note that disabling simply stops the counters from incrementing
+    #[cfg(feature = "vs-41")]
     pub setCoreNodeTiming: unsafe extern "system-unwind" fn(core: *mut VSCore, enable: c_int),
     /// time spent processing frames in nanoseconds, reset sets the counter to 0 again
+    #[cfg(feature = "vs-41")]
     pub getNodeProcessingTime:
         unsafe extern "system-unwind" fn(node: *mut VSNode, reset: c_int) -> i64,
     /// time spent processing frames in nanoseconds in all destroyed nodes, reset sets the counter to 0 again
+    #[cfg(feature = "vs-41")]
     pub getFreedNodeProcessingTime:
         unsafe extern "system-unwind" fn(core: *mut VSCore, reset: c_int) -> i64,
+
+    // MARK: API 4.2
+    /// Same as [`getCoreInfo()`](Self::getCoreInfo), but also reports the
+    /// [`VSCoreCreationFlags`] the core was created with.
+    #[cfg(feature = "vs-42")]
+    pub getCoreInfo2: unsafe extern "system-unwind" fn(core: *mut VSCore, info: *mut VSCoreInfo2),
 
     // MARK: Graph information
     /*
@@ -2198,6 +2259,18 @@ pub struct VSAPI {
     #[cfg(feature = "vs-graph")]
     pub getNodeCreationFunctionName:
         unsafe extern "system-unwind" fn(node: *mut VSNode, level: c_int) -> *const c_char,
+    /// level=0 returns the id of the plugin that created the filter,
+    /// specifying a higher level will retrieve the plugin above that
+    /// invoked it or `NULL` if a non-existent level is requested
+    #[cfg(feature = "vs-graph")]
+    pub getNodeCreationPluginID:
+        unsafe extern "system-unwind" fn(node: *mut VSNode, level: c_int) -> *const c_char,
+    /// level=0 returns the namespace of the plugin that created the filter,
+    /// specifying a higher level will retrieve the plugin above that
+    /// invoked it or `NULL` if a non-existent level is requested
+    #[cfg(feature = "vs-graph")]
+    pub getNodeCreationPluginNS:
+        unsafe extern "system-unwind" fn(node: *mut VSNode, level: c_int) -> *const c_char,
     /// level=0 returns a copy of the arguments passed to the function that created the filter,
     /// returns `NULL` if a non-existent level is requested
     #[cfg(feature = "vs-graph")]
@@ -2205,8 +2278,11 @@ pub struct VSAPI {
         unsafe extern "system-unwind" fn(node: *mut VSNode, level: c_int) -> *const VSMap,
 }
 
+// Since R74 no `VapourSynth` distribution ships an import library, so Windows
+// binds the DLL directly by name instead of going through one.
 #[cfg(feature = "link-vs")]
-#[link(name = "vapoursynth")]
+#[cfg_attr(windows, link(name = "libvapoursynth", kind = "raw-dylib"))]
+#[cfg_attr(not(windows), link(name = "vapoursynth"))]
 unsafe extern "system-unwind" {
     /// Returns a pointer to the global [`VSAPI`] instance.
     ///
@@ -2266,6 +2342,47 @@ mod tests {
             std::mem::size_of::<VSCacheMode>(),
             std::mem::size_of::<c_int>(),
             "VSCacheMode"
+        );
+    }
+
+    /// [`VSAPI`] is a plain array of function pointers, and the library always
+    /// exposes the full struct regardless of the API version a client compiles
+    /// against. A client is therefore only ever allowed to declare a *prefix* of
+    /// it, so a miscounted or mis-gated member silently shifts everything after
+    /// it. Counts come from `vs_internal_vsapi` in upstream `src/core/vsapi.cpp`.
+    #[test]
+    fn vsapi_member_count() {
+        const BASE: usize = 106;
+        const API_41: usize = 10;
+        const API_42: usize = 1;
+        const GRAPH: usize = 4;
+
+        let expected = BASE
+            + if cfg!(feature = "vs-41") { API_41 } else { 0 }
+            + if cfg!(feature = "vs-42") { API_42 } else { 0 }
+            + if cfg!(feature = "vs-graph") { GRAPH } else { 0 };
+
+        assert_eq!(
+            std::mem::size_of::<VSAPI>(),
+            expected * std::mem::size_of::<*const ()>(),
+            "VSAPI should have {expected} members for the enabled features"
+        );
+    }
+
+    /// The struct layout above is only valid if the library is at least as new as
+    /// the API we compiled against, so fail loudly rather than reading past its end.
+    #[cfg(feature = "link-vs")]
+    #[test]
+    fn library_is_new_enough() {
+        let api = unsafe { getVapourSynthAPI(VAPOURSYNTH_API_VERSION) };
+        assert!(
+            !api.is_null(),
+            "the linked library does not support API {VAPOURSYNTH_API_MAJOR}.{VAPOURSYNTH_API_MINOR}"
+        );
+        let reported = unsafe { ((*api).getAPIVersion)() };
+        assert!(
+            reported >= VAPOURSYNTH_API_VERSION,
+            "linked library reports API {reported:#x}, compiled against {VAPOURSYNTH_API_VERSION:#x}"
         );
     }
 }

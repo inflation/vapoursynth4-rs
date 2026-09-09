@@ -29,21 +29,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache
         uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
         with:
-          cache-directories: |
-            vapoursynth/
-            vapoursynth-portable/
-      - name: Set script path
-        id: build-scripts
+          python-version: '3.13'
+      - name: Install VapourSynth
         shell: bash
-        run: |
-          if [ ${{ matrix.os }} == 'windows-latest' ]; then
-            echo "BUILD_SCRIPT=scripts/build-vs.ps1" >> "$GITHUB_OUTPUT"
-          else
-            echo "BUILD_SCRIPT=scripts/build-vs.sh" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Build VapourSynth in debug mode
-        run: ${{ steps.build-scripts.outputs.BUILD_SCRIPT }}
+        run: scripts/install-vs.sh
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Build
@@ -63,11 +54,11 @@ jobs:
           components: llvm-tools
       - name: Cache
         uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
         with:
-          cache-directories: |
-            vapoursynth/
-      - name: Build VapourSynth in debug mode
-        run: scripts/build-vs.sh
+          python-version: '3.13'
+      - name: Install VapourSynth
+        run: scripts/install-vs.sh
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Install cargo-nextest
@@ -79,8 +70,6 @@ jobs:
           --all-features --workspace
           --ignore-filename-regex vapoursynth4-sys/
           --lcov --output-path lcov.info
-        env:
-          VAPOURSYNTH_LIB_PATH: vapoursynth/build/lib
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
@@ -91,19 +80,33 @@ jobs:
   sanitizer:
     name: Sanitizers
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Builds VapourSynth from source, which is far slower than the wheel install
+    # the other jobs use.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - name: Install Rust Nightly
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
+      # Cached separately from the Rust cache: this tree depends only on the
+      # build script, not on Cargo.toml or the toolchain, and keying it off those
+      # threw the whole C++ build away on every version bump. No restore-keys --
+      # a partial match restores a tree built for a different VapourSynth
+      # version, which is worse than rebuilding.
+      - name: Cache VapourSynth
+        uses: actions/cache@v4
+        with:
+          path: vapoursynth/
+          key: vapoursynth-${{ runner.os }}-${{ hashFiles('scripts/build-vs.sh') }}
       - name: Cache
         uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
         with:
-          cache-directories: |
-            vapoursynth/
-      - name: Build VapourSynth in debug mode
+          python-version: '3.13'
+      # Built from source rather than installed from the wheel: ASan only sees
+      # into a dependency that was itself instrumented.
+      - name: Build VapourSynth with AddressSanitizer
         run: scripts/build-vs.sh
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
@@ -116,7 +119,6 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
-          VAPOURSYNTH_LIB_PATH: vapoursynth/build/lib
 
   clippy:
     name: Clippy
