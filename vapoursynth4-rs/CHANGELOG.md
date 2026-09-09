@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.5.2](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-rs-v0.5.1...vapoursynth4-rs-v0.5.2)
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated the following local packages: vapoursynth4-sys - ([0000000](https://github.com/inflation/vapoursynth4-rs/commit/0000000))
+
+
 ## [0.5.1]
 
 Tracks `VapourSynth` R79 via `vapoursynth4-sys` 0.4.1+R79.
