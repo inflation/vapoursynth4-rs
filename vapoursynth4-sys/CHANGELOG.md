@@ -2,6 +2,59 @@
 
 ## [Unreleased]
 
+## [0.4.1+R79]
+
+Tracks `VapourSynth` R79, adding VapourSynth API 4.2 and VSScript API 4.3.
+
+### ⚠️ Breaking Changes
+
+- `VSAPI::getNodeDependencies` is now `getNodeDependency` and takes the `index`
+  argument the C header has always declared. The previous binding was an ABI
+  mismatch.
+- The API 4.1 node timing members (`getCoreNodeTiming`, `setCoreNodeTiming`,
+  `getNodeProcessingTime`, `getFreedNodeProcessingTime`) are now gated on
+  `vs-41`, matching the header. Without the feature they misaligned the tail of
+  the struct against the real library.
+- `VSSCRIPTAPI::freeScript` now returns `()` instead of `c_int`, and
+  `setVariable` is renamed `setVariables` to match the header.
+- On Windows the libraries are bound by DLL name with `raw-dylib`
+  (`libvapoursynth.dll` and `vsscript.dll`). No `VapourSynth` release since R74
+  ships an import library, so `VAPOURSYNTH_LIB_PATH` is no longer needed there.
+- Version features now enable their predecessors: `vs-42` implies `vs-41`,
+  `vs-graph` implies `vs-42`, and `vsscript-43` implies `vsscript-42`.
+  `vs-graph` in particular must imply `vs-42`, because R79 places
+  `getCoreInfo2` between the 4.1 block and the graph functions.
+- API 4.2 replaces the `_ColorRange` frame property with `_Range`, which follows
+  H.273 numbering — **its two values are swapped**. `VSColorRange` is deprecated
+  when `vs-42` is enabled; use `VSRange`.
+
+### ⛰️ Features
+
+- [**breaking**] Add VapourSynth API 4.2 and VSScript API 4.3 - ([a5ae4b8](https://github.com/inflation/vapoursynth4-rs/commit/a5ae4b8307a6fbb8ebf1f9030cb4bb47d51161ad))
+
+  Adds `getCoreInfo2` and `VSCoreInfo2`, the `getNodeCreationPluginID` and
+  `getNodeCreationPluginNS` graph functions, `getVSScriptAPILastError`,
+  `VSRange`, `ccfEnableFrameRefDebug`, `rpFrameReuseLastOnly`, and the YUV410,
+  YUV411 and YUV440 presets for 16-bit integer, half and single precision.
+
+### 🐛 Bug Fixes
+
+- [**breaking**] Bind Windows libraries with raw-dylib - ([f682450](https://github.com/inflation/vapoursynth4-rs/commit/f6824502d63a5d2660f065693d5e849660a25403))
+- [**breaking**] Correct VSAPI and VSSCRIPTAPI ABI mismatches - ([c4ff5a9](https://github.com/inflation/vapoursynth4-rs/commit/c4ff5a99f7a834d29232cfc6c8f11101de94bb7f))
+
+### 📚 Documentation
+
+- Document API 4.2, VSScript 4.3 and the wheel-based setup - ([ea2e82f](https://github.com/inflation/vapoursynth4-rs/commit/ea2e82f0ee3b5c30fa2d4f50a5a17216c11f1eae))
+
+### 🧪 Testing
+
+- Assert VSAPI layout matches the installed library - ([beddd00](https://github.com/inflation/vapoursynth4-rs/commit/beddd0084b58300ae1e0b519f4f7f493f4d3a7e0))
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump `vapoursynth4-sys` to 0.4.1+R79 and `vapoursynth4-rs` to 0.5.1 - ([52106f1](https://github.com/inflation/vapoursynth4-rs/commit/52106f1ec1388bb0c2bbe9434d411b1cfa61a066))
+- Drop the unused optional `cc` dependency
+
 ## [0.3.1](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.3.0...vapoursynth4-sys-v0.3.1)
 
 ### 🚜 Refactor
