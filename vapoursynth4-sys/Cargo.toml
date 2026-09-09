@@ -1,6 +1,6 @@
 [package]
 name = "vapoursynth4-sys"
-version = "0.3.2+R73"
+version = "0.4.0+R73"
 edition = "2024"
 description = "Rust bindings for VapourSynth and VSScript API version 4"
 documentation = "https://docs.rs/vapoursynth4-sys"
@@ -10,7 +10,7 @@ keywords = ["vapoursynth", "vsscript", "video", "bindings"]
 categories = ["external-ffi-bindings", "multimedia::video"]
 
 [dependencies]
-cc = { version = "1.2.48", optional = true }
+cc = { version = "1.4.5", optional = true }
 
 [features]
 # Features for enabling higher API versions.

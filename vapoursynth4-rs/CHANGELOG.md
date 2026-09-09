@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-rs-v0.4.0...vapoursynth4-rs-v0.5.0)
+
+### 🐛 Bug Fixes
+
+- Move get_audio_format to AudioFrame - ([abf3873](https://github.com/inflation/vapoursynth4-rs/commit/abf3873a0e8e9ba9788a76611a1928dfb67ba3f2))
+- Clippy - ([ae1ae21](https://github.com/inflation/vapoursynth4-rs/commit/ae1ae21d292f9c8531afcedfc0aa56dda4050523))
+
+### 📦 Dependencies
+
+- (deps): update const-str requirement from 0.7.0 to 1.1.0 - ([233961c](https://github.com/inflation/vapoursynth4-rs/commit/233961c5b82b8f2967e980c1f3474020cd779b67))
+- (deps): update const-str requirement from 0.6.1 to 0.7.0 - ([a3ca813](https://github.com/inflation/vapoursynth4-rs/commit/a3ca813565504266cfa3b1f7015d791f4404c70c))
+
+
 ## [0.4.0](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-rs-v0.3.0...vapoursynth4-rs-v0.4.0)
 
 ### 🚜 Refactor
