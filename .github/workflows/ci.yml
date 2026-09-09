@@ -80,8 +80,8 @@ jobs:
   sanitizer:
     name: Sanitizers
     runs-on: ubuntu-latest
-    # Builds VapourSynth from source at -O0, which is far slower than the
-    # wheel install the other jobs use.
+    # Builds VapourSynth from source, which is far slower than the wheel install
+    # the other jobs use.
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
@@ -89,11 +89,18 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
+      # Cached separately from the Rust cache: this tree depends only on the
+      # build script, not on Cargo.toml or the toolchain, and keying it off those
+      # threw the whole C++ build away on every version bump. No restore-keys --
+      # a partial match restores a tree built for a different VapourSynth
+      # version, which is worse than rebuilding.
+      - name: Cache VapourSynth
+        uses: actions/cache@v4
+        with:
+          path: vapoursynth/
+          key: vapoursynth-${{ runner.os }}-${{ hashFiles('scripts/build-vs.sh') }}
       - name: Cache
         uses: Swatinem/rust-cache@v2
-        with:
-          cache-directories: |
-            vapoursynth/
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
