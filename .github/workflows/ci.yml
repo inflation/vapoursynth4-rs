@@ -95,7 +95,7 @@ jobs:
       # a partial match restores a tree built for a different VapourSynth
       # version, which is worse than rebuilding.
       - name: Cache VapourSynth
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: vapoursynth/
           key: vapoursynth-${{ runner.os }}-${{ hashFiles('scripts/build-vs.sh') }}
