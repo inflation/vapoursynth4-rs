@@ -2341,4 +2341,45 @@ mod tests {
             "VSCacheMode"
         );
     }
+
+    /// [`VSAPI`] is a plain array of function pointers, and the library always
+    /// exposes the full struct regardless of the API version a client compiles
+    /// against. A client is therefore only ever allowed to declare a *prefix* of
+    /// it, so a miscounted or mis-gated member silently shifts everything after
+    /// it. Counts come from `vs_internal_vsapi` in upstream `src/core/vsapi.cpp`.
+    #[test]
+    fn vsapi_member_count() {
+        const BASE: usize = 106;
+        const API_41: usize = 10;
+        const API_42: usize = 1;
+        const GRAPH: usize = 4;
+
+        let expected = BASE
+            + if cfg!(feature = "vs-41") { API_41 } else { 0 }
+            + if cfg!(feature = "vs-42") { API_42 } else { 0 }
+            + if cfg!(feature = "vs-graph") { GRAPH } else { 0 };
+
+        assert_eq!(
+            std::mem::size_of::<VSAPI>(),
+            expected * std::mem::size_of::<*const ()>(),
+            "VSAPI should have {expected} members for the enabled features"
+        );
+    }
+
+    /// The struct layout above is only valid if the library is at least as new as
+    /// the API we compiled against, so fail loudly rather than reading past its end.
+    #[cfg(feature = "link-vs")]
+    #[test]
+    fn library_is_new_enough() {
+        let api = unsafe { getVapourSynthAPI(VAPOURSYNTH_API_VERSION) };
+        assert!(
+            !api.is_null(),
+            "the linked library does not support API {VAPOURSYNTH_API_MAJOR}.{VAPOURSYNTH_API_MINOR}"
+        );
+        let reported = unsafe { ((*api).getAPIVersion)() };
+        assert!(
+            reported >= VAPOURSYNTH_API_VERSION,
+            "linked library reports API {reported:#x}, compiled against {VAPOURSYNTH_API_VERSION:#x}"
+        );
+    }
 }
