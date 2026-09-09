@@ -2278,8 +2278,11 @@ pub struct VSAPI {
         unsafe extern "system-unwind" fn(node: *mut VSNode, level: c_int) -> *const VSMap,
 }
 
+// Since R74 no `VapourSynth` distribution ships an import library, so Windows
+// binds the DLL directly by name instead of going through one.
 #[cfg(feature = "link-vs")]
-#[link(name = "vapoursynth")]
+#[cfg_attr(windows, link(name = "libvapoursynth", kind = "raw-dylib"))]
+#[cfg_attr(not(windows), link(name = "vapoursynth"))]
 unsafe extern "system-unwind" {
     /// Returns a pointer to the global [`VSAPI`] instance.
     ///
