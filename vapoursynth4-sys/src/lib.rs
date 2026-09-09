@@ -15,6 +15,7 @@ mod vsscript;
 
 pub use crate::constants::*;
 pub use crate::vs::*;
+#[cfg(feature = "vsscript")]
 pub use crate::vsscript::*;
 
 macro_rules! opaque_struct {

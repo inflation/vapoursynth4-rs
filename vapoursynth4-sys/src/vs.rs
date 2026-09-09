@@ -2169,18 +2169,24 @@ pub struct VSAPI {
     #[cfg(feature = "vs-41")]
     pub getNumNodeDependencies: unsafe extern "system-unwind" fn(node: *mut VSNode) -> c_int,
     #[cfg(feature = "vs-41")]
-    pub getNodeDependencies:
-        unsafe extern "system-unwind" fn(node: *mut VSNode) -> *const VSFilterDependency,
+    pub getNodeDependency: unsafe extern "system-unwind" fn(
+        node: *mut VSNode,
+        index: c_int,
+    ) -> *const VSFilterDependency,
 
     /* Node timing functions */
     /// non-zero when filter timing is enabled
+    #[cfg(feature = "vs-41")]
     pub getCoreNodeTiming: unsafe extern "system-unwind" fn(core: *mut VSCore) -> c_int,
     /// non-zero enables filter timing, note that disabling simply stops the counters from incrementing
+    #[cfg(feature = "vs-41")]
     pub setCoreNodeTiming: unsafe extern "system-unwind" fn(core: *mut VSCore, enable: c_int),
     /// time spent processing frames in nanoseconds, reset sets the counter to 0 again
+    #[cfg(feature = "vs-41")]
     pub getNodeProcessingTime:
         unsafe extern "system-unwind" fn(node: *mut VSNode, reset: c_int) -> i64,
     /// time spent processing frames in nanoseconds in all destroyed nodes, reset sets the counter to 0 again
+    #[cfg(feature = "vs-41")]
     pub getFreedNodeProcessingTime:
         unsafe extern "system-unwind" fn(core: *mut VSCore, reset: c_int) -> i64,
 

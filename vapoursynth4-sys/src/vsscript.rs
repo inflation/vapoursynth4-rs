@@ -30,7 +30,7 @@
 
 #![cfg(feature = "vsscript")]
 
-use std::ffi::{c_char, c_int, c_void};
+use std::ffi::{c_char, c_int};
 
 use super::{VSAPI, VSCore, VSMap, VSNode, opaque_struct, vs_make_version};
 
@@ -168,7 +168,7 @@ pub struct VSSCRIPTAPI {
     /// * `vars` - Map containing the variables to set.
     ///
     /// Returns non-zero on error.
-    pub setVariable:
+    pub setVariables:
         unsafe extern "system-unwind" fn(handle: *mut VSScript, vars: *const VSMap) -> c_int,
 
     /// Retrieves a node from the script environment. A node in the script must have been
@@ -208,12 +208,11 @@ pub struct VSSCRIPTAPI {
     ///   have been freed (frames, nodes, etc).
     ///
     /// It is safe to pass `NULL`.
-    pub freeScript: unsafe extern "system-unwind" fn(handle: *mut VSScript) -> c_int,
+    pub freeScript: unsafe extern "system-unwind" fn(handle: *mut VSScript),
 
     /// Set whether or not the working directory is temporarily changed to the same location
     /// as the script file when [`evaluateFile()`](Self::evaluateFile) is called. Off by default.
-    pub evalSetWorkingDir:
-        unsafe extern "system-unwind" fn(handle: *mut VSScript, setCWD: c_int) -> c_void,
+    pub evalSetWorkingDir: unsafe extern "system-unwind" fn(handle: *mut VSScript, setCWD: c_int),
 
     /// Write a list of set output index values to dst but at most size values.
     /// Always returns the total number of available output index values.
