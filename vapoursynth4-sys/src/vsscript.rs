@@ -234,7 +234,7 @@ pub struct VSSCRIPTAPI {
 // binds the DLL directly by name instead of going through one.
 #[cfg(feature = "link-vsscript")]
 #[cfg_attr(windows, link(name = "vsscript", kind = "raw-dylib"))]
-#[cfg_attr(not(windows), link(name = "vapoursynth-script"))]
+#[cfg_attr(not(windows), link(name = "vsscript"))]
 unsafe extern "system-unwind" {
     /// Returns a struct containing function pointer for the api.
     /// Will return `NULL` is the specified version isn’t supported.

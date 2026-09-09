@@ -13,19 +13,13 @@ python -m pip install "vapoursynth==${VS_VERSION}"
 
 VS_DIR="$(python -c 'import vapoursynth, os; print(os.path.dirname(vapoursynth.__file__))')"
 
-# The wheels ship only the runtime sonames, and name the script library after the
-# wheel rather than after the autotools target, so `-lvapoursynth` and
-# `-lvapoursynth-script` find nothing without these. Windows needs none of it:
-# there the libraries are bound by DLL name via `raw-dylib`.
 case "$(uname -s)" in
     Linux*)
         ln -sf "$VS_DIR/libvapoursynth.so.4" "$VS_DIR/libvapoursynth.so"
-        ln -sf "$VS_DIR/libvsscript.so" "$VS_DIR/libvapoursynth-script.so"
         echo "LD_LIBRARY_PATH=${VS_DIR}" >> "$GITHUB_ENV"
         ;;
     Darwin*)
         ln -sf "$VS_DIR/libvapoursynth.4.dylib" "$VS_DIR/libvapoursynth.dylib"
-        ln -sf "$VS_DIR/libvsscript.dylib" "$VS_DIR/libvapoursynth-script.dylib"
         echo "DYLD_LIBRARY_PATH=${VS_DIR}" >> "$GITHUB_ENV"
         ;;
     *)
