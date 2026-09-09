@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [0.4.1+R79]
+
+### ⛰️ Features
+
+- [**breaking**] Add VapourSynth API 4.2 and VSScript API 4.3 - ([a5ae4b8](https://github.com/inflation/vapoursynth4-rs/commit/a5ae4b8307a6fbb8ebf1f9030cb4bb47d51161ad))
+
+### 🐛 Bug Fixes
+
+- [**breaking**] Bind Windows libraries with raw-dylib - ([f682450](https://github.com/inflation/vapoursynth4-rs/commit/f6824502d63a5d2660f065693d5e849660a25403))
+- [**breaking**] Correct VSAPI and VSSCRIPTAPI ABI mismatches - ([c4ff5a9](https://github.com/inflation/vapoursynth4-rs/commit/c4ff5a99f7a834d29232cfc6c8f11101de94bb7f))
+
+### 📚 Documentation
+
+- Document API 4.2, VSScript 4.3 and the wheel-based setup - ([ea2e82f](https://github.com/inflation/vapoursynth4-rs/commit/ea2e82f0ee3b5c30fa2d4f50a5a17216c11f1eae))
+
+### 🧪 Testing
+
+- Assert VSAPI layout matches the installed library - ([beddd00](https://github.com/inflation/vapoursynth4-rs/commit/beddd0084b58300ae1e0b519f4f7f493f4d3a7e0))
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump `vapoursynth4-sys` to 0.4.1+R79 and `vapoursynth4-rs` to 0.5.1 - ([52106f1](https://github.com/inflation/vapoursynth4-rs/commit/52106f1ec1388bb0c2bbe9434d411b1cfa61a066))
+
+
 ## [0.3.1](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.3.0...vapoursynth4-sys-v0.3.1)
 
 ### 🚜 Refactor

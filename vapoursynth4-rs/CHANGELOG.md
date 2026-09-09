@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [0.5.1]
+
+### ⛰️ Features
+
+- Wrap the new API 4.2 and VSScript 4.3 functions - ([4f81484](https://github.com/inflation/vapoursynth4-rs/commit/4f8148486d2a3c5afc532539d0b6232ac43f1a96))
+- [**breaking**] Add VapourSynth API 4.2 and VSScript API 4.3 - ([a5ae4b8](https://github.com/inflation/vapoursynth4-rs/commit/a5ae4b8307a6fbb8ebf1f9030cb4bb47d51161ad))
+
+### 📚 Documentation
+
+- Document API 4.2, VSScript 4.3 and the wheel-based setup - ([ea2e82f](https://github.com/inflation/vapoursynth4-rs/commit/ea2e82f0ee3b5c30fa2d4f50a5a17216c11f1eae))
+
+### 📦 Dependencies
+
+- Update bon and thiserror requirements - ([eba6f8e](https://github.com/inflation/vapoursynth4-rs/commit/eba6f8e1d22ad350532fbf1c693d3d9290d5f7db))
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump `vapoursynth4-sys` to 0.4.1+R79 and `vapoursynth4-rs` to 0.5.1 - ([52106f1](https://github.com/inflation/vapoursynth4-rs/commit/52106f1ec1388bb0c2bbe9434d411b1cfa61a066))
+
+
 ## [0.4.0](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-rs-v0.3.0...vapoursynth4-rs-v0.4.0)
 
 ### 🚜 Refactor
