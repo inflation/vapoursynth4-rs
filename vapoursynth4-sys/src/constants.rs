@@ -8,8 +8,26 @@
 
 #![allow(non_camel_case_types)]
 
+/// Numbering of the `_Range` frame property, which follows H.273.
+///
+/// Added in API 4.2 to replace [`VSColorRange`], whose two values are the other
+/// way around. Filters compiled against API 4.2 or later must only use `_Range`.
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum VSRange {
+    VSC_RANGE_LIMITED = 0,
+    VSC_RANGE_FULL = 1,
+}
+
+/// Numbering of the deprecated `_ColorRange` frame property.
+#[repr(C)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[cfg_attr(
+    feature = "vs-42",
+    deprecated(
+        note = "API 4.2 replaces `_ColorRange` with `_Range`; use `VSRange`, whose 0 and 1 mean the opposite"
+    )
+)]
 pub enum VSColorRange {
     VSC_RANGE_FULL = 0,
     VSC_RANGE_LIMITED = 1,

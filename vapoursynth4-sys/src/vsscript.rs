@@ -35,7 +35,13 @@ use std::ffi::{c_char, c_int};
 use super::{VSAPI, VSCore, VSMap, VSNode, opaque_struct, vs_make_version};
 
 pub const VSSCRIPT_API_MAJOR: u16 = 4;
-pub const VSSCRIPT_API_MINOR: u16 = if cfg!(feature = "vsscript-42") { 2 } else { 1 };
+pub const VSSCRIPT_API_MINOR: u16 = if cfg!(feature = "vsscript-43") {
+    3
+} else if cfg!(feature = "vsscript-42") {
+    2
+} else {
+    1
+};
 pub const VSSCRIPT_API_VERSION: i32 = vs_make_version(VSSCRIPT_API_MAJOR, VSSCRIPT_API_MINOR);
 
 opaque_struct!(
@@ -233,4 +239,9 @@ unsafe extern "system-unwind" {
     ///
     /// It is recommended to always pass [`VSSCRIPT_API_VERSION`].
     pub fn getVSScriptAPI(version: c_int) -> *const VSSCRIPTAPI;
+
+    /// Returns the error message from the last [`getVSScriptAPI()`] failure,
+    /// or an empty string on success.
+    #[cfg(feature = "vsscript-43")]
+    pub fn getVSScriptAPILastError() -> *const c_char;
 }

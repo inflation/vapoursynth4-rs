@@ -19,13 +19,15 @@ const-str = "1.1.0"
 testresult = "0.4.1"
 
 [features]
-default = ["vs-41", "vsscript", "vsscript-42"]
+default = ["vs-42", "vsscript", "vsscript-43"]
 link-vs = ["vapoursynth4-sys/link-vs"]
 link-vsscript = ["vapoursynth4-sys/link-vsscript"]
 vs-41 = ["vapoursynth4-sys/vs-41"]
+vs-42 = ["vapoursynth4-sys/vs-42", "vs-41"]
 vsscript = ["vapoursynth4-sys/vsscript"]
-vsscript-42 = ["vapoursynth4-sys/vsscript-42"]
-vs-graph = ["vapoursynth4-sys/vs-graph"]
+vsscript-42 = ["vapoursynth4-sys/vsscript-42", "vsscript"]
+vsscript-43 = ["vapoursynth4-sys/vsscript-43", "vsscript-42"]
+vs-graph = ["vapoursynth4-sys/vs-graph", "vs-42"]
 
 
 [lints.clippy]

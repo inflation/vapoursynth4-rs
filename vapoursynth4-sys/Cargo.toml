@@ -10,17 +10,19 @@ keywords = ["vapoursynth", "vsscript", "video", "bindings"]
 categories = ["external-ffi-bindings", "multimedia::video"]
 
 [dependencies]
-cc = { version = "1.2.48", optional = true }
 
 [features]
 # Features for enabling higher API versions.
 vs-41 = []
+vs-42 = ["vs-41"]
 
 vsscript = [] # Base VSScript version is 4.1
-vsscript-42 = []
+vsscript-42 = ["vsscript"]
+vsscript-43 = ["vsscript-42"]
 
-# Experimental features.
-vs-graph = []
+# Experimental features. Requires the library to be built with `VS_GRAPH_API`,
+# which is the case for all official builds.
+vs-graph = ["vs-42"]
 
 # Link the VS library
 link-vs = []

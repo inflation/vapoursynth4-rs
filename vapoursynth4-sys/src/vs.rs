@@ -18,7 +18,13 @@ use super::{opaque_struct, vs_make_version};
 pub const VAPOURSYNTH_API_MAJOR: u16 = 4;
 /// Minor API version. It is bumped when new functions are added to [`VSAPI`]
 /// or core behavior is noticeably changed.
-pub const VAPOURSYNTH_API_MINOR: u16 = if cfg!(feature = "vs-41") { 1 } else { 0 };
+pub const VAPOURSYNTH_API_MINOR: u16 = if cfg!(feature = "vs-42") {
+    2
+} else if cfg!(feature = "vs-41") {
+    1
+} else {
+    0
+};
 /// API version. The high 16 bits are [`VAPOURSYNTH_API_MAJOR`], the low 16 bits are
 /// [`VAPOURSYNTH_API_MINOR`].
 pub const VAPOURSYNTH_API_VERSION: i32 =
@@ -195,9 +201,20 @@ pub enum VSPresetVideoFormat {
     YUV422P14 = vs_make_video_id(YUV, Integer, 14, 1, 0),
     YUV444P14 = vs_make_video_id(YUV, Integer, 14, 0, 0),
 
+    YUV410P16 = vs_make_video_id(YUV, Integer, 16, 2, 2),
+    YUV411P16 = vs_make_video_id(YUV, Integer, 16, 2, 0),
+    YUV440P16 = vs_make_video_id(YUV, Integer, 16, 0, 1),
+
     YUV420P16 = vs_make_video_id(YUV, Integer, 16, 1, 1),
     YUV422P16 = vs_make_video_id(YUV, Integer, 16, 1, 0),
     YUV444P16 = vs_make_video_id(YUV, Integer, 16, 0, 0),
+
+    YUV410PH = vs_make_video_id(YUV, Float, 16, 2, 2),
+    YUV410PS = vs_make_video_id(YUV, Float, 32, 2, 2),
+    YUV411PH = vs_make_video_id(YUV, Float, 16, 2, 0),
+    YUV411PS = vs_make_video_id(YUV, Float, 32, 2, 0),
+    YUV440PH = vs_make_video_id(YUV, Float, 16, 0, 1),
+    YUV440PS = vs_make_video_id(YUV, Float, 32, 0, 1),
 
     YUV420PH = vs_make_video_id(YUV, Float, 16, 1, 1),
     YUV420PS = vs_make_video_id(YUV, Float, 32, 1, 1),
@@ -406,6 +423,31 @@ pub struct VSCoreInfo {
     pub used_framebuffer_size: i64,
 }
 
+/// Contains information about a [`VSCore`] instance.
+///
+/// Same as [`VSCoreInfo`], plus the flags the core was created with. Added in API 4.2.
+#[cfg(feature = "vs-42")]
+#[repr(C)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub struct VSCoreInfo2 {
+    /// Printable string containing the name of the library, copyright notice,
+    /// core and API versions.
+    pub version_string: *const c_char,
+    /// Version of the core.
+    pub core: c_int,
+    /// Version of the API.
+    pub api: c_int,
+    /// The [`VSCoreCreationFlags`] the core was created with.
+    pub creation_flags: c_int,
+    /// Number of worker threads.
+    pub num_threads: c_int,
+    /// The framebuffer cache will be allowed to grow up to this size (bytes)
+    /// before memory is aggressively reclaimed.
+    pub max_framebuffer_size: i64,
+    /// Current size of the framebuffer cache, in bytes.
+    pub used_framebuffer_size: i64,
+}
+
 /// Contains information about a clip.
 #[repr(C)]
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -480,6 +522,9 @@ pub enum VSCoreCreationFlags {
     /// (windows feature, not my fault) of a library,
     /// this may help in applications with extreme amount of script reloading.
     DisableLibraryUnloading = 4,
+    /// Outputs a list of all allocated frames as a log message
+    /// after every external frame request has been completed.
+    EnableFrameRefDebug = 8,
 }
 
 impl std::ops::BitOr for VSCoreCreationFlags {
@@ -536,6 +581,10 @@ pub enum VSRequestPattern {
     /// Lut, Expr (conditionally, see [`VSRequestPattern::General`] note)
     /// and similar.
     StrictSpatial = 2,
+    /// Basically identical to [`VSRequestPattern::NoFrameReuse`] except that it hints
+    /// the last frame may be requested multiple times. Added in API 4.1.
+    #[cfg(feature = "vs-41")]
+    FrameReuseLastOnly = 3,
 }
 
 /// Describes how the output of a node is cached.
@@ -2190,6 +2239,12 @@ pub struct VSAPI {
     pub getFreedNodeProcessingTime:
         unsafe extern "system-unwind" fn(core: *mut VSCore, reset: c_int) -> i64,
 
+    // MARK: API 4.2
+    /// Same as [`getCoreInfo()`](Self::getCoreInfo), but also reports the
+    /// [`VSCoreCreationFlags`] the core was created with.
+    #[cfg(feature = "vs-42")]
+    pub getCoreInfo2: unsafe extern "system-unwind" fn(core: *mut VSCore, info: *mut VSCoreInfo2),
+
     // MARK: Graph information
     /*
      * !!! Experimental/expensive graph information
@@ -2203,6 +2258,18 @@ pub struct VSAPI {
     /// invoked it or `NULL` if a non-existent level is requested
     #[cfg(feature = "vs-graph")]
     pub getNodeCreationFunctionName:
+        unsafe extern "system-unwind" fn(node: *mut VSNode, level: c_int) -> *const c_char,
+    /// level=0 returns the id of the plugin that created the filter,
+    /// specifying a higher level will retrieve the plugin above that
+    /// invoked it or `NULL` if a non-existent level is requested
+    #[cfg(feature = "vs-graph")]
+    pub getNodeCreationPluginID:
+        unsafe extern "system-unwind" fn(node: *mut VSNode, level: c_int) -> *const c_char,
+    /// level=0 returns the namespace of the plugin that created the filter,
+    /// specifying a higher level will retrieve the plugin above that
+    /// invoked it or `NULL` if a non-existent level is requested
+    #[cfg(feature = "vs-graph")]
+    pub getNodeCreationPluginNS:
         unsafe extern "system-unwind" fn(node: *mut VSNode, level: c_int) -> *const c_char,
     /// level=0 returns a copy of the arguments passed to the function that created the filter,
     /// returns `NULL` if a non-existent level is requested
