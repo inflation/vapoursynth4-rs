@@ -80,7 +80,9 @@ jobs:
   sanitizer:
     name: Sanitizers
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Builds VapourSynth from source at -O0, which is far slower than the
+    # wheel install the other jobs use.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - name: Install Rust Nightly
@@ -92,7 +94,12 @@ jobs:
         with:
           cache-directories: |
             vapoursynth/
-      - name: Build VapourSynth in debug mode
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      # Built from source rather than installed from the wheel: ASan only sees
+      # into a dependency that was itself instrumented.
+      - name: Build VapourSynth with AddressSanitizer
         run: scripts/build-vs.sh
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
@@ -105,7 +112,6 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
-          VAPOURSYNTH_LIB_PATH: vapoursynth/build/lib
 
   clippy:
     name: Clippy
