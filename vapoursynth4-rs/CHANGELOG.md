@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Bind the R80 Vulkan API behind `vulkan`, using Ash Vulkan types.
+- Add VSScript API 4.4 and GPU-aware output and variable accessors.
+
 - Require Rust 1.95 and use `cfg_select!` for conditional API selection.
 
 - Target VapourSynth API 4.3 (R80) by default, with `vs-43` feature forwarding.

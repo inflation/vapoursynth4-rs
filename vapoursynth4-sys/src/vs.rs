@@ -13,6 +13,8 @@
 use std::ffi::{c_char, c_double, c_float, c_int, c_void};
 
 use super::{opaque_struct, vs_make_version};
+#[cfg(feature = "vulkan")]
+use crate::vulkan::VSVULKANAPI;
 
 /// Major API version.
 pub const VAPOURSYNTH_API_MAJOR: u16 = 4;
@@ -123,7 +125,7 @@ opaque_struct!(
     /// Opaque type representing the current frame request in a filter.
     VSFrameContext,
     /// The companion Vulkan API, declared in upstream `VSVulkan4.h`.
-    #[cfg(feature = "vs-43")]
+    #[cfg(all(feature = "vs-43", not(feature = "vulkan")))]
     VSVULKANAPI
 );
 

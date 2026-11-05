@@ -6,10 +6,12 @@
 
 use std::ops::Deref;
 
+#[cfg(any(feature = "link-vs", feature = "link-vsscript"))]
 use vapoursynth4_sys::vs_make_version;
 
 use crate::ffi;
 
+#[cfg(any(feature = "link-vs", feature = "link-vsscript"))]
 use self::error::ApiNotFound;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -30,6 +32,13 @@ impl Api {
         } else {
             Ok(Self(ptr))
         }
+    }
+
+    /// Returns the Vulkan GPU filtering API associated with this core API version.
+    #[cfg(feature = "vulkan")]
+    #[must_use]
+    pub fn vulkan(&self) -> &ffi::VSVULKANAPI {
+        unsafe { &*(self.getVulkanAPI)() }
     }
 
     pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSAPI) -> Self {
@@ -57,10 +66,12 @@ impl Default for Api {
     }
 }
 
+#[cfg(feature = "vsscript")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct VssApi(*const ffi::VSSCRIPTAPI);
 
+#[cfg(feature = "vsscript")]
 impl VssApi {
     /// Creates a new `VssApi` instance with the specified major and minor version.
     ///
@@ -96,6 +107,7 @@ impl VssApi {
     }
 }
 
+#[cfg(feature = "vsscript")]
 impl Deref for VssApi {
     type Target = ffi::VSSCRIPTAPI;
 

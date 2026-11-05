@@ -17,7 +17,7 @@ Check out [`vapoursynth4-rs`](https://crates.io/crates/vapoursynth4-rs) for a sa
 ## Supported Versions
 
 All VapourSynth and VSScript API versions starting with 4.0 are supported,
-up to VapourSynth API 4.3 (R80) and VSScript API 4.3 (R79).
+up to VapourSynth API 4.3 (R80) and VSScript API 4.4 (R80).
 By default this crate enables no features, i.e. VapourSynth API 4.0.
 To use a specific version, enable the corresponding Cargo feature:
 
@@ -27,13 +27,18 @@ To use a specific version, enable the corresponding Cargo feature:
 - `vsscript` for VSScript API 4.1, the base version
 - `vsscript-42` for VSScript API 4.2 (R69)
 - `vsscript-43` for VSScript API 4.3 (R79)
+- `vsscript-44` for VSScript API 4.4 (R80)
+- `vulkan` for Vulkan GPU APIs and Ash types (implies `vs-43`)
 - `vs-graph` for the experimental graph inspection API (implies `vs-43`)
 
 Each version feature enables the ones below it. Note that API 4.2 replaces the
 `_ColorRange` frame property with `_Range`, whose two values are the other way
 around; enabling `vs-42` deprecates `VSColorRange` in favour of `VSRange`.
 
-API 4.3 adds GPU filter creation and node/frame residency queries.
+API 4.3 adds GPU filter creation and node/frame residency queries. Enable
+`vulkan` to use the GPU API, including device selection, memory allocation,
+shader compilation and command submission. VSScript API 4.4 adds output and
+variable accessors that can preserve GPU residency.
 
 ## Building
 

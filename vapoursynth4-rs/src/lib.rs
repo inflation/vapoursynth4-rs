@@ -14,6 +14,7 @@ pub mod function;
 pub mod map;
 pub mod node;
 pub mod plugin;
+#[cfg(feature = "vsscript")]
 pub mod sciprt;
 pub mod utils;
 
