@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Require Rust 1.95 and use `cfg_select!` for conditional API selection.
+
+- Target VapourSynth API 4.3 (R80) by default, with `vs-43` feature forwarding.
+- Add frame/node residency queries and `Filter::FLAGS` for GPU output.
+- Fix video filter construction to return a node only on success.
+- Update CI runtime installation to R80.
+
 ## [0.5.1]
 
 Tracks `VapourSynth` R79 via `vapoursynth4-sys` 0.4.1+R79.

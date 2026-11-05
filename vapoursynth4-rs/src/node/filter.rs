@@ -15,6 +15,11 @@ pub trait Filter
 where
     Self: Sized + std::panic::RefUnwindSafe,
 {
+    /// Bitmask of [`ffi::VSFilterFlags`] used when creating video nodes.
+    /// GPU output must agree with [`Self::RETURN_TYPE`]; defaults to CPU output.
+    #[cfg(feature = "vs-43")]
+    const FLAGS: i32 = 0;
+
     const FILTER_MODE: FilterMode = FilterMode::Parallel;
     /// Filter error that can turned into a [`&CStr`](std::ffi::CStr)
     type Error: AsRef<CStr>;

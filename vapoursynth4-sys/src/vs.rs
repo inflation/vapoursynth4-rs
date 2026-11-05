@@ -18,12 +18,11 @@ use super::{opaque_struct, vs_make_version};
 pub const VAPOURSYNTH_API_MAJOR: u16 = 4;
 /// Minor API version. It is bumped when new functions are added to [`VSAPI`]
 /// or core behavior is noticeably changed.
-pub const VAPOURSYNTH_API_MINOR: u16 = if cfg!(feature = "vs-42") {
-    2
-} else if cfg!(feature = "vs-41") {
-    1
-} else {
-    0
+pub const VAPOURSYNTH_API_MINOR: u16 = core::cfg_select! {
+    feature = "vs-43" => 3,
+    feature = "vs-42" => 2,
+    feature = "vs-41" => 1,
+    _ => 0,
 };
 /// API version. The high 16 bits are [`VAPOURSYNTH_API_MAJOR`], the low 16 bits are
 /// [`VAPOURSYNTH_API_MINOR`].
@@ -122,7 +121,10 @@ opaque_struct!(
     /// Opaque type representing a registered logger.
     VSLogHandle,
     /// Opaque type representing the current frame request in a filter.
-    VSFrameContext
+    VSFrameContext,
+    /// The companion Vulkan API, declared in upstream `VSVulkan4.h`.
+    #[cfg(feature = "vs-43")]
+    VSVULKANAPI
 );
 
 #[repr(C)]
@@ -232,6 +234,35 @@ pub enum VSPresetVideoFormat {
 
     RGBH = vs_make_video_id(RGB, Float, 16, 0, 0),
     RGBS = vs_make_video_id(RGB, Float, 32, 0, 0),
+}
+
+/// Options for [`createVideoFilterEx()`](VSAPI::createVideoFilterEx) and
+/// [`createVideoFilterEx2()`](VSAPI::createVideoFilterEx2).
+///
+/// Added in API 4.3.
+#[cfg(feature = "vs-43")]
+#[repr(C)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum VSFilterFlags {
+    /// Output frames reside on the GPU. The registered return type must be
+    /// `vnode:gpu` or `vnode:all`; `vnode` requires CPU output. The core aborts
+    /// if the declared residency or returned frames disagree with this flag.
+    GPUOutput = 1,
+}
+
+/// Storage location reported by [`getNodeResidency()`](VSAPI::getNodeResidency)
+/// and [`getFrameResidency()`](VSAPI::getFrameResidency). Independent of
+/// [`VSMediaType`]: GPU clips are still video.
+///
+/// Added in API 4.3.
+#[cfg(feature = "vs-43")]
+#[repr(C)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum VSNodeResidency {
+    /// Data resides in host memory.
+    CPU = 0,
+    /// Data resides in GPU memory.
+    GPU = 1,
 }
 
 /// Controls how a filter will be multithreaded, if at all.
@@ -1913,7 +1944,7 @@ pub struct VSAPI {
     /// # Arguments
     ///
     /// * `name` - Filter name. The characters allowed are letters, numbers, and the underscore.
-    ///   The first character must be a letter. In other words: ^[a-zA-Z][a-zA-Z0-9_]*$
+    ///   The first character must be a letter. In other words: `^[a-zA-Z][a-zA-Z0-9_]*$`
     ///
     ///     Filter names _should be_ `PascalCase`.
     ///
@@ -2245,6 +2276,68 @@ pub struct VSAPI {
     #[cfg(feature = "vs-42")]
     pub getCoreInfo2: unsafe extern "system-unwind" fn(core: *mut VSCore, info: *mut VSCoreInfo2),
 
+    // MARK: API 4.3
+    /// Like [`createVideoFilter()`](Self::createVideoFilter), with an extra
+    /// `flags` bitmask of [`VSFilterFlags`]. Use 0 for CPU output or
+    /// [`GPUOutput`](VSFilterFlags::GPUOutput) for GPU output.
+    /// Unknown bits cause an error in `out`.
+    ///
+    /// Added in API 4.3.
+    #[cfg(feature = "vs-43")]
+    pub createVideoFilterEx: unsafe extern "system-unwind" fn(
+        out: *mut VSMap,
+        name: *const c_char,
+        vi: *const VSVideoInfo,
+        getFrame: VSFilterGetFrame,
+        free: VSFilterFree,
+        filterMode: VSFilterMode,
+        flags: c_int,
+        dependencies: *const VSFilterDependency,
+        numDeps: c_int,
+        instanceData: *mut c_void,
+        core: *mut VSCore,
+    ),
+    /// Like [`createVideoFilterEx()`](Self::createVideoFilterEx), but returns
+    /// the node instead of appending it to `out`. Returns `NULL` on failure,
+    /// including unknown flag bits.
+    ///
+    /// Added in API 4.3.
+    #[cfg(feature = "vs-43")]
+    pub createVideoFilterEx2: unsafe extern "system-unwind" fn(
+        name: *const c_char,
+        vi: *const VSVideoInfo,
+        getFrame: VSFilterGetFrame,
+        free: VSFilterFree,
+        filterMode: VSFilterMode,
+        flags: c_int,
+        dependencies: *const VSFilterDependency,
+        numDeps: c_int,
+        instanceData: *mut c_void,
+        core: *mut VSCore,
+    ) -> *mut VSNode,
+    /// Obtains the GPU API described in `VSVulkan4.h`. The pointer is never
+    /// `NULL`; device availability must be checked separately through that API.
+    /// Its version follows the core API, queried with
+    /// [`getAPIVersion()`](Self::getAPIVersion).
+    ///
+    /// Added in API 4.3.
+    #[cfg(feature = "vs-43")]
+    pub getVulkanAPI: unsafe extern "system-unwind" fn() -> *const VSVULKANAPI,
+    /// Reports [`GPU`](VSNodeResidency::GPU) for nodes created with
+    /// [`GPUOutput`](VSFilterFlags::GPUOutput), otherwise
+    /// [`CPU`](VSNodeResidency::CPU). Useful for `vnode:all` inputs.
+    ///
+    /// Added in API 4.3.
+    #[cfg(feature = "vs-43")]
+    pub getNodeResidency: unsafe extern "system-unwind" fn(node: *mut VSNode) -> VSNodeResidency,
+    /// Reports the storage location of a frame's planes. Frame properties
+    /// remain accessible regardless of residency.
+    ///
+    /// Added in API 4.3.
+    #[cfg(feature = "vs-43")]
+    pub getFrameResidency:
+        unsafe extern "system-unwind" fn(frame: *const VSFrame) -> VSNodeResidency,
+
     // MARK: Graph information
     /*
      * !!! Experimental/expensive graph information
@@ -2355,11 +2448,13 @@ mod tests {
         const BASE: usize = 106;
         const API_41: usize = 10;
         const API_42: usize = 1;
+        const API_43: usize = 5;
         const GRAPH: usize = 4;
 
         let expected = BASE
             + if cfg!(feature = "vs-41") { API_41 } else { 0 }
             + if cfg!(feature = "vs-42") { API_42 } else { 0 }
+            + if cfg!(feature = "vs-43") { API_43 } else { 0 }
             + if cfg!(feature = "vs-graph") { GRAPH } else { 0 };
 
         assert_eq!(
@@ -2367,6 +2462,29 @@ mod tests {
             expected * std::mem::size_of::<*const ()>(),
             "VSAPI should have {expected} members for the enabled features"
         );
+    }
+
+    #[cfg(feature = "vs-43")]
+    #[test]
+    fn api_43_offsets() {
+        let pointer = std::mem::size_of::<*const ()>();
+        assert_eq!(
+            std::mem::offset_of!(VSAPI, createVideoFilterEx),
+            117 * pointer
+        );
+        assert_eq!(
+            std::mem::offset_of!(VSAPI, getFrameResidency),
+            121 * pointer
+        );
+        #[cfg(feature = "vs-graph")]
+        assert_eq!(
+            std::mem::offset_of!(VSAPI, getNodeCreationFunctionName),
+            122 * pointer
+        );
+        assert_eq!(VAPOURSYNTH_API_VERSION, vs_make_version(4, 3));
+        assert_eq!(VSFilterFlags::GPUOutput as c_int, 1);
+        assert_eq!(VSNodeResidency::CPU as c_int, 0);
+        assert_eq!(VSNodeResidency::GPU as c_int, 1);
     }
 
     /// The struct layout above is only valid if the library is at least as new as

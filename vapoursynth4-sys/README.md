@@ -17,22 +17,27 @@ Check out [`vapoursynth4-rs`](https://crates.io/crates/vapoursynth4-rs) for a sa
 ## Supported Versions
 
 All VapourSynth and VSScript API versions starting with 4.0 are supported,
-up to VapourSynth API 4.2 and VSScript API 4.3 (R79).
+up to VapourSynth API 4.3 (R80) and VSScript API 4.3 (R79).
 By default this crate enables no features, i.e. VapourSynth API 4.0.
 To use a specific version, enable the corresponding Cargo feature:
 
 - `vs-41` for VapourSynth API 4.1 (R66)
 - `vs-42` for VapourSynth API 4.2 (R74)
+- `vs-43` for VapourSynth API 4.3 (R80)
 - `vsscript` for VSScript API 4.1, the base version
 - `vsscript-42` for VSScript API 4.2 (R69)
 - `vsscript-43` for VSScript API 4.3 (R79)
-- `vs-graph` for the experimental graph inspection API (implies `vs-42`)
+- `vs-graph` for the experimental graph inspection API (implies `vs-43`)
 
 Each version feature enables the ones below it. Note that API 4.2 replaces the
 `_ColorRange` frame property with `_Range`, whose two values are the other way
 around; enabling `vs-42` deprecates `VSColorRange` in favour of `VSRange`.
 
+API 4.3 adds GPU filter creation and node/frame residency queries.
+
 ## Building
+
+Requires Rust 1.95 or newer.
 
 Linking is optional and enabled with the `link-vs` and `link-vsscript` features.
 If you enable them, make sure the corresponding libraries are available.
@@ -41,7 +46,8 @@ The simplest way to get them on any platform is the official wheel, which is the
 same payload the Windows installer and the portable zip ship since R74:
 
 ```sh
-pip install vapoursynth==79
+pip install vapoursynth==80
+python -m vapoursynth config
 ```
 
 Use the `VAPOURSYNTH_LIB_PATH` environment variable to point at the directory

@@ -5,7 +5,7 @@
 # itself built with it, so the wheel used everywhere else (scripts/install-vs.sh)
 # is not enough here.
 #
-# R79 uses Meson (autotools was dropped after R70) and requires a C++20 compiler.
+# R80 uses Meson (autotools was dropped after R70) and requires a C++20 compiler.
 # zimg and libp2p are declared as Meson wraps, so they are fetched and built as
 # subprojects -- and b_sanitize instruments them too.
 #
@@ -14,7 +14,7 @@
 
 set -euxo pipefail
 
-VS_VERSION="${VS_VERSION:-R79}"
+VS_VERSION="${VS_VERSION:-R80}"
 
 ROOT="$PWD/vapoursynth"
 SRC="$ROOT/src-$VS_VERSION"
@@ -28,7 +28,7 @@ if [ ! -d "$SRC" ]; then
         https://github.com/vapoursynth/vapoursynth "$SRC"
 fi
 
-# R79 needs meson >= 1.3.0 and builds the Python module, so install rather than
+# R80 needs meson >= 1.3.0 and builds the Python module, so install rather than
 # relying on whatever the runner happens to ship.
 python -m pip install --upgrade meson ninja cython
 
@@ -79,3 +79,5 @@ ln -sf "$VS_DIR/libvsscript.so" "$VS_DIR/libvapoursynth-script.so"
     echo "DYLD_LIBRARY_PATH=${VS_DIR}"
     echo "PYTHONPATH=${SITE_PACKAGES}"
 } >> "$GITHUB_ENV"
+
+PYTHONPATH="$SITE_PACKAGES" LD_LIBRARY_PATH="$VS_DIR" python -m vapoursynth config
