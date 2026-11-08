@@ -11,10 +11,8 @@ use crate::{
     node::FilterMode,
 };
 
-pub trait Filter
-where
-    Self: Sized + std::panic::RefUnwindSafe,
-{
+/// A filter instance that VapourSynth can move between worker threads and call concurrently.
+pub trait Filter: Sized + Send + Sync + std::panic::RefUnwindSafe + 'static {
     /// Bitmask of [`ffi::VSFilterFlags`] used when creating video nodes.
     /// GPU output must agree with [`Self::RETURN_TYPE`]; defaults to CPU output.
     #[cfg(feature = "vs-43")]
