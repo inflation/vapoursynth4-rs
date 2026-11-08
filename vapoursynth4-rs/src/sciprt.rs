@@ -1,5 +1,6 @@
 use std::{
     ffi::{CStr, c_int},
+    mem::ManuallyDrop,
     ptr::{NonNull, null_mut},
 };
 
@@ -52,18 +53,20 @@ impl OutputNode {
 impl Script {
     /// Creates a new script instance.
     ///
+    /// A supplied core is transferred to VSScript. Pass `None` to use a default core.
+    ///
     /// # Panics
     ///
-    /// Panics if the script creation fails.
-    pub fn new(core: Option<&Core>, vssapi: VssApi) -> Self {
+    /// Panics if the VapourSynth API version is unavailable or script creation fails.
+    pub fn new(core: Option<Core>, vssapi: VssApi) -> Self {
         unsafe {
-            let handle = NonNull::new((vssapi.createScript)(
-                core.map_or(null_mut(), |c| c.as_ptr()),
-            ))
-            .expect("Failed to create script");
             let api_ptr = (vssapi.getVSAPI)(VAPOURSYNTH_API_VERSION);
-            assert!(!api_ptr.is_null());
+            assert!(!api_ptr.is_null(), "VapourSynth API version unavailable");
             let api = Api::from_ptr(api_ptr);
+            // createScript takes ownership even if it returns null.
+            let core = core.map_or(null_mut(), |core| ManuallyDrop::new(core).as_ptr());
+            let handle =
+                NonNull::new((vssapi.createScript)(core)).expect("Failed to create script");
             Self {
                 handle,
                 vssapi,
@@ -278,6 +281,20 @@ impl ScriptError {
             })
         }
     }
+}
+
+#[cfg(all(test, feature = "link-vs", feature = "link-vsscript"))]
+#[test]
+fn script_uses_the_supplied_core() {
+    let core = Core::builder()
+        .disable_auto_loading()
+        .thread_count(2)
+        .build();
+    let ptr = core.as_ptr();
+    let script = Script::new(Some(core), VssApi::default());
+    let borrowed = script.core().unwrap();
+    assert_eq!(borrowed.as_ptr(), ptr);
+    assert_eq!(borrowed.get_info().num_threads, 2);
 }
 
 #[cfg(all(test, feature = "link-vsscript", feature = "vsscript-44"))]
