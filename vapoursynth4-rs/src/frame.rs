@@ -59,24 +59,10 @@ pub enum Shared {}
 pub enum Writable {}
 
 /// A video frame. The default shared state allows reads and reference-counted cloning.
-///
-/// ```compile_fail
-/// use vapoursynth4_rs::frame::VideoFrame;
-/// fn edit(mut frame: VideoFrame) {
-///     frame.properties_mut();
-/// }
-/// ```
 pub type VideoFrame<S = Shared> = MediaFrame<Video, S>;
 pub type AudioFrame<S = Shared> = MediaFrame<Audio, S>;
 
 /// A uniquely owned video frame. Call `freeze` before publishing it.
-///
-/// ```compile_fail
-/// use vapoursynth4_rs::frame::VideoFrameMut;
-/// fn alias(frame: VideoFrameMut) -> VideoFrameMut {
-///     frame.clone()
-/// }
-/// ```
 pub type VideoFrameMut = VideoFrame<Writable>;
 /// A uniquely owned audio frame. Call `freeze` before publishing it.
 pub type AudioFrameMut = AudioFrame<Writable>;

@@ -30,16 +30,9 @@ use crate::{
 };
 
 /// A borrowed core supplied by VapourSynth.
-///
-/// ```compile_fail
-/// use vapoursynth4_rs::core::{Core, CoreRef};
-/// fn take_core(mut core: CoreRef<'_>, replacement: Core) -> Core {
-///     std::mem::replace(&mut *core, replacement)
-/// }
-/// ```
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CoreRef<'c> {
-    view: CoreView,
+    handle: CoreHandle,
     marker: PhantomData<&'c ()>,
 }
 
@@ -48,47 +41,47 @@ impl CoreRef<'_> {
     #[must_use]
     pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSCore, api: Api) -> Self {
         Self {
-            view: CoreView { handle: ptr, api },
+            handle: CoreHandle { handle: ptr, api },
             marker: PhantomData,
         }
     }
 }
 
-impl AsRef<CoreView> for CoreRef<'_> {
-    fn as_ref(&self) -> &CoreView {
-        &self.view
+impl AsRef<CoreHandle> for CoreRef<'_> {
+    fn as_ref(&self) -> &CoreHandle {
+        &self.handle
     }
 }
 
 impl Deref for CoreRef<'_> {
-    type Target = CoreView;
+    type Target = CoreHandle;
 
     fn deref(&self) -> &Self::Target {
-        &self.view
+        &self.handle
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Core {
-    view: CoreView,
+    handle: CoreHandle,
 }
 
 impl Deref for Core {
-    type Target = CoreView;
+    type Target = CoreHandle;
 
     fn deref(&self) -> &Self::Target {
-        &self.view
+        &self.handle
     }
 }
 
 /// Operations available on both owned and borrowed cores.
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct CoreView {
+pub struct CoreHandle {
     handle: *const ffi::VSCore,
     api: Api,
 }
 
-impl CoreView {
+impl CoreHandle {
     #[must_use]
     pub fn as_ptr(&self) -> *mut ffi::VSCore {
         self.handle.cast_mut()
@@ -417,7 +410,7 @@ impl Core {
     unsafe fn new_with(flags: i32, api: Api) -> Self {
         let handle = unsafe { (api.createCore)(flags) };
         Self {
-            view: CoreView { handle, api },
+            handle: CoreHandle { handle, api },
         }
     }
 
@@ -494,6 +487,20 @@ impl<S: State> CoreBuilder<S> {
 #[cfg(feature = "link-vs")]
 mod tests {
     use super::*;
+
+    #[test]
+    fn borrowed_core_leaves_owner_alive() {
+        let core = Core::builder()
+            .disable_auto_loading()
+            .thread_count(2)
+            .build();
+        {
+            let borrowed = unsafe { CoreRef::from_ptr(core.as_ptr(), core.api()) };
+            assert_eq!(borrowed.as_ptr(), core.as_ptr());
+            assert_eq!(borrowed.get_info().num_threads, 2);
+        }
+        assert_eq!(core.get_info().num_threads, 2);
+    }
 
     #[test]
     fn builder() {

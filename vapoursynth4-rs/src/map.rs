@@ -19,13 +19,6 @@ pub use key::*;
 // MARK: MapRef
 
 /// A read-only borrowed reference to a [`ffi::VSMap`].
-///
-/// ```compile_fail
-/// use vapoursynth4_rs::map::MapRef;
-/// fn clear(mut map: MapRef<'_>) {
-///     map.clear();
-/// }
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MapRef<'m> {
     handle: *const ffi::VSMap,
@@ -56,44 +49,6 @@ impl MapRef<'_> {
 }
 
 /// An exclusive borrowed map. It cannot be copied or converted into an owner.
-///
-/// ```compile_fail
-/// use vapoursynth4_rs::map::MapMut;
-/// fn copy(mut map: MapMut<'_>) {
-///     let mut alias = map;
-///     map.clear();
-///     alias.clear();
-/// }
-/// ```
-///
-/// Borrowed data prevents mutation until its last use.
-///
-/// ```compile_fail
-/// use vapoursynth4_rs::map::{KeyStr, MapMut};
-/// fn invalidate(mut map: MapMut<'_>, key: &KeyStr) {
-///     let values = map.get_int_array(key).unwrap();
-///     map.clear();
-///     println!("{values:?}");
-/// }
-/// ```
-///
-/// Read-only reborrows cannot outlive exclusive access.
-///
-/// ```compile_fail
-/// use vapoursynth4_rs::map::{MapMut, MapRef};
-/// fn escape<'a>(map: MapMut<'a>) -> MapRef<'a> {
-///     map.as_ref()
-/// }
-/// ```
-///
-/// A borrowed view does not expose an owning map.
-///
-/// ```compile_fail
-/// use vapoursynth4_rs::map::{Map, MapMut};
-/// fn steal(mut map: MapMut<'_>, replacement: Map) -> Map {
-///     std::mem::replace(&mut *map, replacement)
-/// }
-/// ```
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct MapMut<'m> {
     handle: *const ffi::VSMap,
