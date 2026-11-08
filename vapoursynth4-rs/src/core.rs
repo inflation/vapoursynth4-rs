@@ -184,8 +184,17 @@ impl CoreHandle {
         }
     }
 
+    /// Calls VapourSynth's video plane assembly without validation.
+    ///
+    /// # Safety
+    ///
+    /// The destination format and size must be valid. Both arrays must contain at
+    /// least `format.num_planes` entries. Each non-null source must be a live
+    /// video frame with a valid plane index, matching dimensions and sample
+    /// storage, and compatible residency and device. Frames must be valid for
+    /// this core's API.
     #[must_use]
-    pub fn new_video_frame2(
+    pub unsafe fn new_video_frame2(
         &self,
         format: &VideoFormat,
         width: i32,
@@ -226,8 +235,16 @@ impl CoreHandle {
         }
     }
 
+    /// Calls VapourSynth's audio channel assembly without validation.
+    ///
+    /// # Safety
+    ///
+    /// The destination format and sample count must be valid. Both arrays must
+    /// contain at least `format.num_channels` entries. Each non-null source must
+    /// be a live audio frame with a valid channel index and matching sample
+    /// storage and frame length. Frames must be valid for this core's API.
     #[must_use]
-    pub fn new_audio_frame2(
+    pub unsafe fn new_audio_frame2(
         &self,
         format: &AudioFormat,
         num_samples: i32,
