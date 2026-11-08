@@ -17,50 +17,31 @@ case "$(uname -s)" in
         echo "DYLD_LIBRARY_PATH=$(brew --prefix vulkan-loader)/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}" >> "$GITHUB_ENV"
         ;;
     MINGW*|MSYS*|CYGWIN*)
-        installer_script="$RUNNER_TEMP/install-vulkan.ps1"
-        cat > "$installer_script" <<'POWERSHELL'
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
+        cd "$RUNNER_TEMP"
+        version=1.4.341.0
+        sdk="$PWD/vulkan-sdk"
+        sdk_windows=$(cygpath -w "$sdk")
+        curl -fsSL "https://sdk.lunarg.com/sdk/download/$version/windows/vulkansdk-windows-X64-$version.exe" -o vulkan-sdk.exe
+        echo "5072ac63f0b00bc8c132bc0052bac0456f61983bd9d5dd50f614e190472db875  vulkan-sdk.exe" | sha256sum -c -
+        MSYS2_ARG_CONV_EXCL='*' ./vulkan-sdk.exe --root "$sdk_windows" --accept-licenses --default-answer --confirm-command install
+        test -f "$sdk/Include/vulkan/vulkan_core.h"
 
-function Download($url, $file, $sha256) {
-    Invoke-WebRequest -Uri $url -OutFile $file
-    if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ne $sha256) {
-        throw "Checksum mismatch for $file"
-    }
-}
+        curl -fsSL https://github.com/jakoch/rasterizers/releases/download/20261006/lavapipe-x64-26.2.4.zip -o lavapipe.zip
+        echo "dd6d69c0df698bacf6633711912e8eb1cf6e70b2796d46240c7ee3708e27a438  lavapipe.zip" | sha256sum -c -
+        unzip -q lavapipe.zip -d lavapipe
+        test -f lavapipe/bin/vulkan_lvp.dll
+        library=$(cygpath -m "$PWD/lavapipe/bin/vulkan_lvp.dll")
+        printf '{"file_format_version":"1.0.0","ICD":{"library_path":"%s","api_version":"1.4.0"}}\n' "$library" > lavapipe/lvp_icd.json
+        driver=$(cygpath -w "$PWD/lavapipe/lvp_icd.json")
 
-$version = '1.4.341.0'
-$sdk = "$env:RUNNER_TEMP/vulkan-sdk"
-$installer = "$env:RUNNER_TEMP/vulkan-sdk.exe"
-Download "https://sdk.lunarg.com/sdk/download/$version/windows/vulkansdk-windows-X64-$version.exe" $installer '5072ac63f0b00bc8c132bc0052bac0456f61983bd9d5dd50f614e190472db875'
-$installerArgs = "--root `"$sdk`" --accept-licenses --default-answer --confirm-command install"
-$process = Start-Process -FilePath $installer -ArgumentList $installerArgs -Wait -PassThru -WindowStyle Hidden
-if ($process.ExitCode -ne 0) { throw "Vulkan SDK installer exited with $($process.ExitCode)" }
-if (-not (Test-Path "$sdk/Include/vulkan/vulkan_core.h")) { throw 'Vulkan headers not found' }
-
-$archive = "$env:RUNNER_TEMP/lavapipe.zip"
-$lavapipe = "$env:RUNNER_TEMP/lavapipe"
-Download 'https://github.com/jakoch/rasterizers/releases/download/20261006/lavapipe-x64-26.2.4.zip' $archive 'dd6d69c0df698bacf6633711912e8eb1cf6e70b2796d46240c7ee3708e27a438'
-Expand-Archive -LiteralPath $archive -DestinationPath $lavapipe
-$driver = "$lavapipe/lvp_icd.json"
-@{
-    file_format_version = '1.0.0'
-    ICD = @{
-        library_path = (Resolve-Path "$lavapipe/bin/vulkan_lvp.dll").Path
-        api_version = '1.4.0'
-    }
-} | ConvertTo-Json -Compress | Set-Content -LiteralPath $driver
-# The Vulkan loader ignores VK_DRIVER_FILES in elevated processes.
-reg.exe add 'HKLM\SOFTWARE\Khronos\Vulkan\Drivers' /v $driver /t REG_DWORD /d 0 /f
-if ($LASTEXITCODE -ne 0) { throw "Lavapipe registration failed with $LASTEXITCODE" }
-$env:VK_DRIVER_FILES = $driver
-& "$sdk/Bin/vulkaninfoSDK.exe" --summary
-if ($LASTEXITCODE -ne 0) { throw "vulkaninfo exited with $LASTEXITCODE" }
-"VULKAN_SDK=$sdk" >> $env:GITHUB_ENV
-"VK_DRIVER_FILES=$driver" >> $env:GITHUB_ENV
-"$sdk/Bin" >> $env:GITHUB_PATH
-POWERSHELL
-        pwsh -NoLogo -NoProfile -NonInteractive -File "$(cygpath -w "$installer_script")"
+        # The Vulkan loader ignores VK_DRIVER_FILES in elevated processes.
+        MSYS2_ARG_CONV_EXCL='*' reg.exe add 'HKLM\SOFTWARE\Khronos\Vulkan\Drivers' /v "$driver" /t REG_DWORD /d 0 /f
+        VK_DRIVER_FILES="$driver" "$sdk/Bin/vulkaninfoSDK.exe" --summary
+        {
+            echo "VULKAN_SDK=$sdk_windows"
+            echo "VK_DRIVER_FILES=$driver"
+        } >> "$GITHUB_ENV"
+        cygpath -w "$sdk/Bin" >> "$GITHUB_PATH"
         exit
         ;;
     *)
