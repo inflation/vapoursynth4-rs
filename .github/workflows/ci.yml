@@ -119,6 +119,7 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
+          LSAN_OPTIONS: "suppressions=${{ github.workspace }}/.github/lsan.supp"
 
   clippy:
     name: Clippy
