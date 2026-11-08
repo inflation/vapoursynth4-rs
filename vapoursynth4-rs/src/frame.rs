@@ -260,7 +260,9 @@ mod tests {
     #[test]
     fn freezing_preserves_handle_and_copying_isolates_properties() {
         let core = Core::builder().build();
-        let format = core.query_video_format(ColorFamily::Gray, SampleType::Integer, 8, 0, 0);
+        let format = core
+            .query_video_format(ColorFamily::Gray, SampleType::Integer, 8, 0, 0)
+            .unwrap();
         let mut original = core.new_video_frame(&format, 16, 16, None);
         let key = key!(c"test");
         original

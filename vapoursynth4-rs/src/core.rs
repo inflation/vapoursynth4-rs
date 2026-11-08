@@ -275,6 +275,7 @@ impl CoreHandle {
         }
     }
 
+    /// Returns the format if VapourSynth accepts the requested parameters.
     #[must_use]
     pub fn query_video_format(
         &self,
@@ -283,10 +284,10 @@ impl CoreHandle {
         bits_per_sample: i32,
         subsampling_w: i32,
         subsampling_h: i32,
-    ) -> VideoFormat {
+    ) -> Option<VideoFormat> {
         unsafe {
             let mut format = MaybeUninit::uninit();
-            (self.api.queryVideoFormat)(
+            let success = (self.api.queryVideoFormat)(
                 format.as_mut_ptr(),
                 color_family,
                 sample_type,
@@ -295,7 +296,7 @@ impl CoreHandle {
                 subsampling_h,
                 self.as_ptr(),
             );
-            format.assume_init()
+            (success != 0).then(|| format.assume_init())
         }
     }
 
@@ -309,23 +310,24 @@ impl CoreHandle {
         }
     }
 
+    /// Returns the format if VapourSynth accepts the requested parameters.
     #[must_use]
     pub fn query_audio_format(
         &self,
         sample_type: SampleType,
         bits_per_sample: i32,
         channel_layout: u64,
-    ) -> AudioFormat {
+    ) -> Option<AudioFormat> {
         unsafe {
             let mut format = MaybeUninit::uninit();
-            (self.api.queryAudioFormat)(
+            let success = (self.api.queryAudioFormat)(
                 format.as_mut_ptr(),
                 sample_type,
                 bits_per_sample,
                 channel_layout,
                 self.as_ptr(),
             );
-            format.assume_init()
+            (success != 0).then(|| format.assume_init())
         }
     }
 
@@ -360,12 +362,13 @@ impl CoreHandle {
         }
     }
 
+    /// Returns the format if VapourSynth recognizes the ID.
     #[must_use]
-    pub fn get_video_format_by_id(&self, id: u32) -> VideoFormat {
+    pub fn get_video_format_by_id(&self, id: u32) -> Option<VideoFormat> {
         unsafe {
             let mut format = MaybeUninit::uninit();
-            (self.api.getVideoFormatByID)(format.as_mut_ptr(), id, self.as_ptr());
-            format.assume_init()
+            let success = (self.api.getVideoFormatByID)(format.as_mut_ptr(), id, self.as_ptr());
+            (success != 0).then(|| format.assume_init())
         }
     }
 
@@ -504,6 +507,20 @@ impl<S: State> CoreBuilder<S> {
 #[cfg(feature = "link-vs")]
 mod tests {
     use super::*;
+
+    #[test]
+    fn format_queries_return_none_on_failure() {
+        let core = Core::builder().disable_auto_loading().build();
+        assert!(
+            core.query_video_format(ColorFamily::Gray, SampleType::Integer, 0, 0, 0)
+                .is_none()
+        );
+        assert!(
+            core.query_audio_format(SampleType::Integer, 16, 0)
+                .is_none()
+        );
+        assert!(core.get_video_format_by_id(u32::MAX).is_none());
+    }
 
     #[test]
     fn borrowed_core_leaves_owner_alive() {

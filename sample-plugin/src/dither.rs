@@ -57,13 +57,15 @@ impl Filter for DitherFilter {
 
         // Update output info to reflect the new bit depth.
         let mut vi = node.info().clone();
-        vi.format = core.query_video_format(
-            vi.format.color_family,
-            vi.format.sample_type,
-            bits,
-            vi.format.sub_sampling_w,
-            vi.format.sub_sampling_h,
-        );
+        vi.format = core
+            .query_video_format(
+                vi.format.color_family,
+                vi.format.sample_type,
+                bits,
+                vi.format.sub_sampling_w,
+                vi.format.sub_sampling_h,
+            )
+            .ok_or(c"Unsupported output format")?;
 
         let filter = DitherFilter {
             node: dithered_node,
