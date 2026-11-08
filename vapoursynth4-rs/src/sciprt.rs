@@ -16,7 +16,7 @@ use super::ffi;
 #[cfg(feature = "vsscript-44")]
 use crate::map::Map;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Script {
     handle: NonNull<ffi::VSScript>,
     vssapi: VssApi,
