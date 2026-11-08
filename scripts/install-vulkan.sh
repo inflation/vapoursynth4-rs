@@ -50,6 +50,9 @@ $driver = "$lavapipe/lvp_icd.json"
         api_version = '1.4.0'
     }
 } | ConvertTo-Json -Compress | Set-Content -LiteralPath $driver
+# The Vulkan loader ignores VK_DRIVER_FILES in elevated processes.
+reg.exe add 'HKLM\SOFTWARE\Khronos\Vulkan\Drivers' /v $driver /t REG_DWORD /d 0 /f
+if ($LASTEXITCODE -ne 0) { throw "Lavapipe registration failed with $LASTEXITCODE" }
 $env:VK_DRIVER_FILES = $driver
 & "$sdk/Bin/vulkaninfoSDK.exe" --summary
 if ($LASTEXITCODE -ne 0) { throw "vulkaninfo exited with $LASTEXITCODE" }
