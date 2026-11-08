@@ -3,7 +3,7 @@ pub mod types;
 
 use std::{borrow::Borrow, ffi::CStr, ptr::NonNull};
 
-use crate::{api::Api, core::Core, ffi, map::Map};
+use crate::{api::Api, core::CoreView, ffi, map::Map};
 
 pub use plugin_function::*;
 pub use types::*;
@@ -97,11 +97,11 @@ impl Plugin {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Plugins<'c> {
     cursor: *mut ffi::VSPlugin,
-    core: &'c Core,
+    core: &'c CoreView,
 }
 
 impl<'c> Plugins<'c> {
-    pub(crate) fn new(core: &'c Core) -> Plugins<'c> {
+    pub(crate) fn new(core: &'c CoreView) -> Plugins<'c> {
         Self {
             cursor: std::ptr::null_mut(),
             core,

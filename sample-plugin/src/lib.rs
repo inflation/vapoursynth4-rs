@@ -29,7 +29,7 @@ impl Filter for DumbFilter {
         input: MapRef,
         mut output: MapMut,
         _data: Option<Box<Self::FilterData>>,
-        mut core: CoreRef,
+        core: CoreRef,
     ) -> Result<(), Self::Error> {
         let Ok(node) = input.get_video_node(key!(c"clip"), 0) else {
             return Err(c"Failed to get clip");

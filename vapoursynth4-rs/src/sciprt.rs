@@ -57,8 +57,10 @@ impl Script {
     /// Panics if the script creation fails.
     pub fn new(core: Option<&Core>, vssapi: VssApi) -> Self {
         unsafe {
-            let handle = NonNull::new((vssapi.createScript)(core.map_or(null_mut(), Core::as_ptr)))
-                .expect("Failed to create script");
+            let handle = NonNull::new((vssapi.createScript)(
+                core.map_or(null_mut(), |c| c.as_ptr()),
+            ))
+            .expect("Failed to create script");
             let api_ptr = (vssapi.getVSAPI)(VAPOURSYNTH_API_VERSION);
             assert!(!api_ptr.is_null());
             let api = Api::from_ptr(api_ptr);
