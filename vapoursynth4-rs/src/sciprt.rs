@@ -338,10 +338,11 @@ mod tests {
             )
         };
         if status != 0 {
-            eprintln!(
-                "Skipping GPU residency test: {}",
-                unsafe { CStr::from_ptr(error.as_ptr()) }.to_string_lossy()
-            );
+            let error = unsafe { CStr::from_ptr(error.as_ptr()) }.to_string_lossy();
+            if std::env::var_os("VAPOURSYNTH_REQUIRE_VULKAN").is_some() {
+                return Err(format!("Vulkan initialization failed: {error}").into());
+            }
+            eprintln!("Skipping GPU residency test: {error}");
             return Ok(());
         }
         script.evaluate(c"import vapoursynth as vs\nclip = vs.core.std.BlankClip(width=16, height=16, length=1, format=vs.GRAY8)\ngpu = vs.core.std.GPUUpload(clip)\ngpu.set_output(0)\ngpu_frame = gpu.get_frame(0)\n", c"api44_gpu.vpy")?;

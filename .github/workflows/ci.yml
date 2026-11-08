@@ -89,6 +89,14 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
+      - name: Install Vulkan headers and Lavapipe
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libvulkan-dev mesa-vulkan-drivers vulkan-tools
+          driver=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' -print -quit)
+          test -f "$driver"
+          VK_DRIVER_FILES="$driver" XDG_RUNTIME_DIR="$RUNNER_TEMP" vulkaninfo --summary
+          echo "VK_DRIVER_FILES=$driver" >> "$GITHUB_ENV"
       # Cached separately from the Rust cache: this tree depends only on the
       # build script, not on Cargo.toml or the toolchain, and keying it off those
       # threw the whole C++ build away on every version bump. No restore-keys --
@@ -98,7 +106,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: vapoursynth/
-          key: vapoursynth-${{ runner.os }}-${{ hashFiles('scripts/build-vs.sh') }}
+          key: vapoursynth-${{ runner.os }}-vulkan-${{ hashFiles('scripts/build-vs.sh') }}
       - name: Cache
         uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v7
@@ -120,6 +128,7 @@ jobs:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
           LSAN_OPTIONS: "suppressions=${{ github.workspace }}/.github/lsan.supp"
+          VAPOURSYNTH_REQUIRE_VULKAN: "1"
 
   clippy:
     name: Clippy
