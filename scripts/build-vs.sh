@@ -80,4 +80,15 @@ ln -sf "$VS_DIR/libvsscript.so" "$VS_DIR/libvapoursynth-script.so"
     echo "PYTHONPATH=${SITE_PACKAGES}"
 } >> "$GITHUB_ENV"
 
+# Python itself is not instrumented, so it needs the ASan runtime preloaded
+# to import the module. Keep the preload local to configuration so the Rust
+# test executables can use their own linked ASan runtime.
+ASAN_RUNTIME="$("$CC" -print-file-name=libclang_rt.asan-$(uname -m).so)"
+if [ ! -f "$ASAN_RUNTIME" ]; then
+    echo "Clang's shared AddressSanitizer runtime was not found: $ASAN_RUNTIME" >&2
+    exit 1
+fi
+
+ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}detect_leaks=0" \
+LD_PRELOAD="$ASAN_RUNTIME${LD_PRELOAD:+:$LD_PRELOAD}" \
 PYTHONPATH="$SITE_PACKAGES" LD_LIBRARY_PATH="$VS_DIR" python -m vapoursynth config
