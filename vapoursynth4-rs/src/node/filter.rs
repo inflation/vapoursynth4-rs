@@ -1,6 +1,6 @@
 use std::{
     ffi::{CStr, c_void},
-    ptr::null_mut,
+    ptr::{from_ref, null_mut},
 };
 
 use crate::{
@@ -22,7 +22,8 @@ pub trait Filter: Sized + Send + Sync + std::panic::RefUnwindSafe + 'static {
     /// Filter error that can turned into a [`&CStr`](std::ffi::CStr)
     type Error: AsRef<CStr>;
     type FrameType: Frame;
-    type FilterData; // TODO: Ensure Send + Sync when FILTER_MODE is Parallel
+    /// Shared registration data available to each call to [`Self::create`].
+    type FilterData: Sync + 'static;
 
     const NAME: &'static CStr;
     const ARGS: &'static CStr;
@@ -35,7 +36,7 @@ pub trait Filter: Sized + Send + Sync + std::panic::RefUnwindSafe + 'static {
     fn create(
         input: MapRef,
         output: MapMut,
-        data: Option<Box<Self::FilterData>>,
+        data: Option<&Self::FilterData>,
         core: CoreRef,
     ) -> Result<(), Self::Error>;
 
@@ -58,15 +59,17 @@ pub trait Filter: Sized + Send + Sync + std::panic::RefUnwindSafe + 'static {
 }
 
 pub struct FilterRegister<F: Filter> {
-    data: Option<F::FilterData>,
+    data: Option<&'static F::FilterData>,
 }
 
 impl<F: Filter> FilterRegister<F> {
-    pub fn new(data: Option<F::FilterData>) -> Self {
+    pub fn new(data: Option<&'static F::FilterData>) -> Self {
         Self { data }
     }
 
     /// # Safety
+    ///
+    /// Both pointers must be valid for a VapourSynth plugin registration call.
     pub unsafe fn register(self, plugin: *mut ffi::VSPlugin, vspapi: *const ffi::VSPLUGINAPI) {
         use super::internal::FilterExtern;
 
@@ -77,7 +80,7 @@ impl<F: Filter> FilterRegister<F> {
                 F::RETURN_TYPE.as_ptr(),
                 F::filter_create,
                 self.data
-                    .map_or(null_mut(), |d| Box::into_raw(Box::new(d)).cast()),
+                    .map_or(null_mut(), |data| from_ref(data).cast_mut().cast()),
                 plugin,
             )
         };

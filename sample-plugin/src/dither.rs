@@ -25,7 +25,7 @@ impl Filter for DitherFilter {
     fn create(
         input: MapRef,
         mut output: MapMut,
-        _data: Option<Box<Self::FilterData>>,
+        _data: Option<&Self::FilterData>,
         core: CoreRef,
     ) -> Result<(), Self::Error> {
         let Ok(node) = input.get_video_node(key!(c"clip"), 0) else {

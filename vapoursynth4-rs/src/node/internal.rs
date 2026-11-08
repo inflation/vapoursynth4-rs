@@ -62,11 +62,7 @@ pub trait FilterExtern: Filter {
             let input = MapRef::from_ptr(in_, api);
             let mut output = MapMut::from_ptr(out, api);
             let core = CoreRef::from_ptr(core, api);
-            let data = if user_data.is_null() {
-                None
-            } else {
-                Some(Box::from_raw(user_data.cast()))
-            };
+            let data = user_data.cast::<Self::FilterData>().as_ref();
 
             if let Err(payload) = catch_unwind(AssertUnwindSafe(|| {
                 if let Err(error) = Self::create(input, output.reborrow(), data, core) {
@@ -142,6 +138,62 @@ impl<F> FilterExtern for F where F: Filter {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "link-vs")]
+    #[test]
+    fn factory_can_reuse_registration_data() {
+        use crate::{core::Core, frame::VideoFrame};
+
+        struct TestFilter;
+
+        impl Filter for TestFilter {
+            type Error = &'static CStr;
+            type FrameType = VideoFrame;
+            type FilterData = &'static CStr;
+
+            const NAME: &'static CStr = c"Test";
+            const ARGS: &'static CStr = c"";
+            const RETURN_TYPE: &'static CStr = c"";
+
+            fn create(
+                _: MapRef<'_>,
+                _: MapMut<'_>,
+                data: Option<&Self::FilterData>,
+                _: CoreRef<'_>,
+            ) -> Result<(), Self::Error> {
+                Err(data.copied().unwrap_or(c"missing registration data"))
+            }
+
+            fn get_frame(
+                &self,
+                _: i32,
+                _: ffi::VSActivationReason,
+                _: *mut *mut c_void,
+                _: FrameContext,
+                _: CoreRef<'_>,
+            ) -> Result<Option<Self::FrameType>, Self::Error> {
+                Ok(None)
+            }
+        }
+
+        static DATA: &CStr = c"registration data";
+        let core = Core::builder().disable_auto_loading().build();
+        let input = core.create_map();
+        let user_data = std::ptr::from_ref(&DATA).cast_mut().cast();
+        for _ in 0..2 {
+            let output = core.create_map();
+            unsafe {
+                TestFilter::filter_create(
+                    input.as_ptr(),
+                    output.as_ptr(),
+                    user_data,
+                    core.as_ptr(),
+                    &*core.api(),
+                );
+            }
+            assert_eq!(output.get_error(), Some(DATA));
+        }
+    }
 
     #[test]
     fn panic_text_is_appended_to_the_common_message() {
