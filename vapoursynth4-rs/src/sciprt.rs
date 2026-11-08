@@ -418,8 +418,6 @@ mod tests {
     #[cfg(feature = "vulkan")]
     #[test]
     fn api_44_gpu_residency() -> testresult::TestResult {
-        use crate::frame::Frame;
-
         let script = Script::default();
         let api = script.get_api();
         let mut info = std::mem::MaybeUninit::<ffi::VSVulkanCoreInfo>::uninit();

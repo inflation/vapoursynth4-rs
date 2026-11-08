@@ -1,7 +1,6 @@
 use std::{
     ffi::{CStr, c_char, c_int},
     mem::ManuallyDrop,
-    ops::{Deref, DerefMut},
 };
 
 use thiserror::Error;
@@ -19,7 +18,14 @@ pub use key::*;
 
 // MARK: MapRef
 
-/// A borrowed reference to a [`ffi::VSMap`].
+/// A read-only borrowed reference to a [`ffi::VSMap`].
+///
+/// ```compile_fail
+/// use vapoursynth4_rs::map::MapRef;
+/// fn clear(mut map: MapRef<'_>) {
+///     map.clear();
+/// }
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MapRef<'m> {
     handle: *const ffi::VSMap,
@@ -30,7 +36,7 @@ pub struct MapRef<'m> {
 unsafe impl Send for MapRef<'_> {}
 
 impl MapRef<'_> {
-    // Safety: `ptr` must be valid
+    // The map must remain valid and immutable for the view's lifetime.
     #[inline]
     pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSMap, api: Api) -> Self {
         debug_assert!(!ptr.is_null());
@@ -42,23 +48,85 @@ impl MapRef<'_> {
     }
 
     /// Returns a raw pointer to the wrapped value.
+    #[must_use]
     #[inline]
-    pub(crate) fn as_ptr(&self) -> *mut ffi::VSMap {
+    pub fn as_ptr(&self) -> *const ffi::VSMap {
+        self.handle
+    }
+}
+
+/// An exclusive borrowed map. It cannot be copied or converted into an owner.
+///
+/// ```compile_fail
+/// use vapoursynth4_rs::map::MapMut;
+/// fn copy(mut map: MapMut<'_>) {
+///     let mut alias = map;
+///     map.clear();
+///     alias.clear();
+/// }
+/// ```
+///
+/// Borrowed data prevents mutation until its last use.
+///
+/// ```compile_fail
+/// use vapoursynth4_rs::map::{KeyStr, MapMut};
+/// fn invalidate(mut map: MapMut<'_>, key: &KeyStr) {
+///     let values = map.get_int_array(key).unwrap();
+///     map.clear();
+///     println!("{values:?}");
+/// }
+/// ```
+///
+/// Read-only reborrows cannot outlive exclusive access.
+///
+/// ```compile_fail
+/// use vapoursynth4_rs::map::{MapMut, MapRef};
+/// fn escape<'a>(map: MapMut<'a>) -> MapRef<'a> {
+///     map.as_ref()
+/// }
+/// ```
+///
+/// A borrowed view does not expose an owning map.
+///
+/// ```compile_fail
+/// use vapoursynth4_rs::map::{Map, MapMut};
+/// fn steal(mut map: MapMut<'_>, replacement: Map) -> Map {
+///     std::mem::replace(&mut *map, replacement)
+/// }
+/// ```
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct MapMut<'m> {
+    handle: *const ffi::VSMap,
+    api: Api,
+    marker: std::marker::PhantomData<&'m mut ()>,
+}
+
+unsafe impl Send for MapMut<'_> {}
+
+impl MapMut<'_> {
+    // The map must remain valid and exclusively borrowed for the view's lifetime.
+    pub(crate) unsafe fn from_ptr(ptr: *mut ffi::VSMap, api: Api) -> Self {
+        debug_assert!(!ptr.is_null());
+        Self {
+            handle: ptr,
+            api,
+            marker: std::marker::PhantomData,
+        }
+    }
+
+    #[must_use]
+    pub fn as_ptr(&self) -> *mut ffi::VSMap {
         self.handle.cast_mut()
     }
-}
 
-impl Deref for MapRef<'_> {
-    type Target = Map;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*std::ptr::from_ref(self).cast() }
+    #[must_use]
+    pub fn as_ref(&self) -> MapRef<'_> {
+        unsafe { MapRef::from_ptr(self.handle, self.api) }
     }
-}
 
-impl DerefMut for MapRef<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *std::ptr::from_mut(self).cast() }
+    #[must_use]
+    pub fn reborrow(&mut self) -> MapMut<'_> {
+        unsafe { MapMut::from_ptr(self.as_ptr(), self.api) }
     }
 }
 
@@ -88,462 +156,508 @@ impl Map {
     }
 }
 
-impl Map {
-    pub fn clear(&mut self) {
-        // safety: `self.handle` is a valid pointer
-        unsafe { (self.api.clearMap)(self.as_ptr()) }
-    }
-
-    pub fn set_error(&mut self, msg: &CStr) {
-        // safety: `self.handle` and `msg` are valid pointers
-        unsafe { (self.api.mapSetError)(self.as_ptr(), msg.as_ptr()) }
-    }
-
-    #[must_use]
-    pub fn get_error(&self) -> Option<&CStr> {
-        let ptr = unsafe { (self.api.mapGetError)(self.as_ptr()) };
-        if ptr.is_null() {
-            None
-        } else {
-            Some(unsafe { CStr::from_ptr(ptr) })
-        }
-    }
-
-    #[must_use]
-    pub fn len(&self) -> i32 {
-        // safety: `self.handle` is a valid pointer
-        unsafe { (self.api.mapNumKeys)(self.as_ptr()) }
-    }
-
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    // MARK: Get
-
-    /// # Panics
-    ///
-    /// Panics if `index` is out of bounds.
-    #[must_use]
-    pub fn get_key(&self, index: i32) -> &KeyStr {
-        assert!(!(index < 0 || index >= self.len()), "index out of bounds");
-
-        // safety: `self.handle` is a valid pointer
-        unsafe { KeyStr::from_ptr((self.api.mapGetKey)(self.as_ptr(), index)) }
-    }
-
-    pub fn delete_key(&mut self, key: &KeyStr) {
-        // safety: `self.handle` and `key` are valid pointers
-        unsafe { (self.api.mapDeleteKey)(self.as_ptr(), key.as_ptr()) };
-    }
-
-    #[must_use]
-    pub fn num_elements(&self, key: &KeyStr) -> Option<i32> {
-        // safety: `self.handle` is a valid pointer
-        let res = unsafe { (self.api.mapNumElements)(self.as_ptr(), key.as_ptr()) };
-        if res == -1 { None } else { Some(res) }
-    }
-
-    unsafe fn get_internal<T>(
-        &self,
-        func: unsafe extern "system-unwind" fn(
-            *const ffi::VSMap,
-            *const c_char,
-            c_int,
-            *mut ffi::VSMapPropertyError,
-        ) -> T,
-        key: &KeyStr,
-        index: i32,
-    ) -> Result<T, MapPropertyError> {
-        let mut error = ffi::VSMapPropertyError::Success;
-        handle_get_error(
-            unsafe { func(self.as_ptr(), key.as_ptr(), index, &raw mut error) },
-            error,
-        )
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get_int(&self, key: &KeyStr, index: i32) -> Result<i64, MapPropertyError> {
-        unsafe { self.get_internal(self.api.mapGetInt, key, index) }
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get_float(&self, key: &KeyStr, index: i32) -> Result<f64, MapPropertyError> {
-        unsafe { self.get_internal(self.api.mapGetFloat, key, index) }
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    #[allow(clippy::cast_sign_loss)]
-    pub fn get_binary(&self, key: &KeyStr, index: i32) -> Result<&[u8], MapPropertyError> {
-        use ffi::VSDataTypeHint as dt;
-
-        unsafe {
-            if let dt::Unknown | dt::Binary =
-                self.get_internal(self.api.mapGetDataTypeHint, key, index)?
-            {
-                let size = self.get_internal(self.api.mapGetDataSize, key, index)?;
-                let ptr = self.get_internal(self.api.mapGetData, key, index)?;
-
-                Ok(std::slice::from_raw_parts(ptr.cast(), size as _))
+macro_rules! map_read_methods {
+    () => {
+        #[must_use]
+        pub fn get_error(&self) -> Option<&CStr> {
+            let ptr = unsafe { (self.api.mapGetError)(self.as_ptr()) };
+            if ptr.is_null() {
+                None
             } else {
-                Err(MapPropertyError::InvalidType)
+                Some(unsafe { CStr::from_ptr(ptr) })
             }
         }
-    }
 
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    #[allow(clippy::cast_sign_loss)]
-    pub fn get_utf8(&self, key: &KeyStr, index: i32) -> Result<&str, MapPropertyError> {
-        unsafe {
-            if let ffi::VSDataTypeHint::Utf8 =
-                self.get_internal(self.api.mapGetDataTypeHint, key, index)?
-            {
-                let size = self.get_internal(self.api.mapGetDataSize, key, index)?;
-                let ptr = self.get_internal(self.api.mapGetData, key, index)?;
-
-                Ok(std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-                    ptr.cast(),
-                    size as _,
-                )))
-            } else {
-                Err(MapPropertyError::InvalidType)
-            }
+        #[must_use]
+        pub fn len(&self) -> i32 {
+            // safety: `self.handle` is a valid pointer
+            unsafe { (self.api.mapNumKeys)(self.as_ptr()) }
         }
-    }
 
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get_function(&self, key: &KeyStr, index: i32) -> Result<Function, MapPropertyError> {
-        unsafe {
-            self.get_internal(self.api.mapGetFunction, key, index)
-                .map(|p| Function::from_ptr(p, self.api))
+        #[must_use]
+        pub fn is_empty(&self) -> bool {
+            self.len() == 0
         }
-    }
 
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get_video_node(&self, key: &KeyStr, index: i32) -> Result<VideoNode, MapPropertyError> {
-        unsafe {
-            self.get_internal(self.api.mapGetNode, key, index)
-                .map(|p| VideoNode::from_ptr(p, self.api))
+        // MARK: Get
+
+        /// # Panics
+        ///
+        /// Panics if `index` is out of bounds.
+        #[must_use]
+        pub fn get_key(&self, index: i32) -> &KeyStr {
+            assert!(!(index < 0 || index >= self.len()), "index out of bounds");
+
+            // safety: `self.handle` is a valid pointer
+            unsafe { KeyStr::from_ptr((self.api.mapGetKey)(self.as_ptr(), index)) }
         }
-    }
 
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get_audio_node(&self, key: &KeyStr, index: i32) -> Result<AudioNode, MapPropertyError> {
-        unsafe {
-            self.get_internal(self.api.mapGetNode, key, index)
-                .map(|p| AudioNode::from_ptr(p, self.api))
+        #[must_use]
+        pub fn num_elements(&self, key: &KeyStr) -> Option<i32> {
+            // safety: `self.handle` is a valid pointer
+            let res = unsafe { (self.api.mapNumElements)(self.as_ptr(), key.as_ptr()) };
+            if res == -1 { None } else { Some(res) }
         }
-    }
 
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get_video_frame(
-        &self,
-        key: &KeyStr,
-        index: i32,
-    ) -> Result<VideoFrame, MapPropertyError> {
-        unsafe {
-            self.get_internal(self.api.mapGetFrame, key, index)
-                .map(|p| VideoFrame::from_ptr(p, self.api))
+        unsafe fn get_internal<T>(
+            &self,
+            func: unsafe extern "system-unwind" fn(
+                *const ffi::VSMap,
+                *const c_char,
+                c_int,
+                *mut ffi::VSMapPropertyError,
+            ) -> T,
+            key: &KeyStr,
+            index: i32,
+        ) -> Result<T, MapPropertyError> {
+            let mut error = ffi::VSMapPropertyError::Success;
+            handle_get_error(
+                unsafe { func(self.as_ptr(), key.as_ptr(), index, &raw mut error) },
+                error,
+            )
         }
-    }
 
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get_audio_frame(
-        &self,
-        key: &KeyStr,
-        index: i32,
-    ) -> Result<AudioFrame, MapPropertyError> {
-        unsafe {
-            self.get_internal(self.api.mapGetFrame, key, index)
-                .map(|p| AudioFrame::from_ptr(p, self.api))
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get_int(&self, key: &KeyStr, index: i32) -> Result<i64, MapPropertyError> {
+            unsafe { self.get_internal(self.api.mapGetInt, key, index) }
         }
-    }
 
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get(&self, key: &KeyStr, index: i32) -> Result<Value<'_>, MapPropertyError> {
-        use ffi::VSPropertyType as t;
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get_float(&self, key: &KeyStr, index: i32) -> Result<f64, MapPropertyError> {
+            unsafe { self.get_internal(self.api.mapGetFloat, key, index) }
+        }
 
-        unsafe {
-            match (self.api.mapGetType)(self.as_ptr(), key.as_ptr()) {
-                t::Unset => Err(MapPropertyError::KeyNotFound),
-                t::Int => self.get_int(key, index).map(Value::Int),
-                t::Float => self.get_float(key, index).map(Value::Float),
-                t::Data => {
-                    use ffi::VSDataTypeHint as dt;
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        #[allow(clippy::cast_sign_loss)]
+        pub fn get_binary(&self, key: &KeyStr, index: i32) -> Result<&[u8], MapPropertyError> {
+            use ffi::VSDataTypeHint as dt;
 
+            unsafe {
+                if let dt::Unknown | dt::Binary =
+                    self.get_internal(self.api.mapGetDataTypeHint, key, index)?
+                {
                     let size = self.get_internal(self.api.mapGetDataSize, key, index)?;
-                    #[allow(clippy::cast_sign_loss)]
-                    match self.get_internal(self.api.mapGetDataTypeHint, key, index)? {
-                        dt::Unknown | dt::Binary => {
-                            let ptr = self.get_internal(self.api.mapGetData, key, index)?;
-                            Ok(Value::Data(std::slice::from_raw_parts(
-                                ptr.cast(),
-                                size as _,
-                            )))
-                        }
-                        dt::Utf8 => {
-                            let ptr = self.get_internal(self.api.mapGetData, key, index)?;
-                            Ok(Value::Utf8(std::str::from_utf8_unchecked(
-                                std::slice::from_raw_parts(ptr.cast(), size as _),
-                            )))
+                    let ptr = self.get_internal(self.api.mapGetData, key, index)?;
+
+                    Ok(std::slice::from_raw_parts(ptr.cast(), size as _))
+                } else {
+                    Err(MapPropertyError::InvalidType)
+                }
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        #[allow(clippy::cast_sign_loss)]
+        pub fn get_utf8(&self, key: &KeyStr, index: i32) -> Result<&str, MapPropertyError> {
+            unsafe {
+                if let ffi::VSDataTypeHint::Utf8 =
+                    self.get_internal(self.api.mapGetDataTypeHint, key, index)?
+                {
+                    let size = self.get_internal(self.api.mapGetDataSize, key, index)?;
+                    let ptr = self.get_internal(self.api.mapGetData, key, index)?;
+
+                    Ok(std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+                        ptr.cast(),
+                        size as _,
+                    )))
+                } else {
+                    Err(MapPropertyError::InvalidType)
+                }
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get_function(&self, key: &KeyStr, index: i32) -> Result<Function, MapPropertyError> {
+            unsafe {
+                self.get_internal(self.api.mapGetFunction, key, index)
+                    .map(|p| Function::from_ptr(p, self.api))
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get_video_node(
+            &self,
+            key: &KeyStr,
+            index: i32,
+        ) -> Result<VideoNode, MapPropertyError> {
+            unsafe {
+                self.get_internal(self.api.mapGetNode, key, index)
+                    .map(|p| VideoNode::from_ptr(p, self.api))
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get_audio_node(
+            &self,
+            key: &KeyStr,
+            index: i32,
+        ) -> Result<AudioNode, MapPropertyError> {
+            unsafe {
+                self.get_internal(self.api.mapGetNode, key, index)
+                    .map(|p| AudioNode::from_ptr(p, self.api))
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get_video_frame(
+            &self,
+            key: &KeyStr,
+            index: i32,
+        ) -> Result<VideoFrame, MapPropertyError> {
+            unsafe {
+                self.get_internal(self.api.mapGetFrame, key, index)
+                    .map(|p| VideoFrame::from_ptr(p, self.api))
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get_audio_frame(
+            &self,
+            key: &KeyStr,
+            index: i32,
+        ) -> Result<AudioFrame, MapPropertyError> {
+            unsafe {
+                self.get_internal(self.api.mapGetFrame, key, index)
+                    .map(|p| AudioFrame::from_ptr(p, self.api))
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get(&self, key: &KeyStr, index: i32) -> Result<Value<'_>, MapPropertyError> {
+            use ffi::VSPropertyType as t;
+
+            unsafe {
+                match (self.api.mapGetType)(self.as_ptr(), key.as_ptr()) {
+                    t::Unset => Err(MapPropertyError::KeyNotFound),
+                    t::Int => self.get_int(key, index).map(Value::Int),
+                    t::Float => self.get_float(key, index).map(Value::Float),
+                    t::Data => {
+                        use ffi::VSDataTypeHint as dt;
+
+                        let size = self.get_internal(self.api.mapGetDataSize, key, index)?;
+                        #[allow(clippy::cast_sign_loss)]
+                        match self.get_internal(self.api.mapGetDataTypeHint, key, index)? {
+                            dt::Unknown | dt::Binary => {
+                                let ptr = self.get_internal(self.api.mapGetData, key, index)?;
+                                Ok(Value::Data(std::slice::from_raw_parts(
+                                    ptr.cast(),
+                                    size as _,
+                                )))
+                            }
+                            dt::Utf8 => {
+                                let ptr = self.get_internal(self.api.mapGetData, key, index)?;
+                                Ok(Value::Utf8(std::str::from_utf8_unchecked(
+                                    std::slice::from_raw_parts(ptr.cast(), size as _),
+                                )))
+                            }
                         }
                     }
-                }
-                t::Function => self.get_function(key, index).map(Value::Function),
-                t::VideoNode => self.get_video_node(key, index).map(Value::VideoNode),
-                t::AudioNode => self.get_audio_node(key, index).map(Value::AudioNode),
-                t::VideoFrame => self.get_video_frame(key, index).map(Value::VideoFrame),
-                t::AudioFrame => self.get_audio_frame(key, index).map(Value::AudioFrame),
-            }
-        }
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get_int_saturated(&self, key: &KeyStr, index: i32) -> Result<i32, MapPropertyError> {
-        unsafe { self.get_internal(self.api.mapGetIntSaturated, key, index) }
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get_int_array(&self, key: &KeyStr) -> Result<&[i64], MapPropertyError> {
-        let mut error = ffi::VSMapPropertyError::Success;
-        unsafe {
-            let size = self
-                .num_elements(key)
-                .ok_or(MapPropertyError::KeyNotFound)?;
-            let ptr = handle_get_error(
-                (self.api.mapGetIntArray)(self.as_ptr(), key.as_ptr(), &raw mut error),
-                error,
-            )?;
-
-            #[allow(clippy::cast_sign_loss)]
-            Ok(std::slice::from_raw_parts(ptr, size as _))
-        }
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get_float_saturated(&self, key: &KeyStr, index: i32) -> Result<f32, MapPropertyError> {
-        // safety: `self.handle` is a valid pointer
-        unsafe { self.get_internal(self.api.mapGetFloatSaturated, key, index) }
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn get_float_array(&self, key: &KeyStr) -> Result<&[f64], MapPropertyError> {
-        let mut error = ffi::VSMapPropertyError::Success;
-        unsafe {
-            let size = self
-                .num_elements(key)
-                .ok_or(MapPropertyError::KeyNotFound)?;
-            let ptr = handle_get_error(
-                (self.api.mapGetFloatArray)(self.as_ptr(), key.as_ptr(), &raw mut error),
-                error,
-            )?;
-
-            #[allow(clippy::cast_sign_loss)]
-            Ok(std::slice::from_raw_parts(ptr, size as _))
-        }
-    }
-
-    // MARK: Set
-
-    /// # Panics
-    ///
-    /// Panics if the key exists or is invalid
-    pub fn set_empty(&mut self, key: &KeyStr, type_: ffi::VSPropertyType) {
-        // safety: `self.handle` is a valid pointer
-        let res = unsafe { (self.api.mapSetEmpty)(self.as_ptr(), key.as_ptr(), type_) };
-        assert!(res != 0);
-    }
-
-    unsafe fn set_internal<T>(
-        &mut self,
-        func: unsafe extern "system-unwind" fn(
-            *mut ffi::VSMap,
-            *const c_char,
-            T,
-            ffi::VSMapAppendMode,
-        ) -> c_int,
-        key: &KeyStr,
-        val: T,
-        append: ffi::VSMapAppendMode,
-    ) -> Result<(), MapPropertyError> {
-        handle_set_error(unsafe { func(self.as_ptr(), key.as_ptr(), val, append) })
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError::InvalidType`] if the `key`'s type is not the same with `val`
-    ///
-    /// # Panics
-    ///
-    /// Panic if the [`Value::Data`]'s or [`Value::Utf8`]'s len is larger than [`i32::MAX`]
-    pub fn set(
-        &mut self,
-        key: &KeyStr,
-        val: Value,
-        append: AppendMode,
-    ) -> Result<(), MapPropertyError> {
-        unsafe {
-            match val {
-                Value::Int(val) => self.set_internal(self.api.mapSetInt, key, val, append),
-                Value::Float(val) => self.set_internal(self.api.mapSetFloat, key, val, append),
-                Value::Data(val) => handle_set_error((self.api.mapSetData)(
-                    self.as_ptr(),
-                    key.as_ptr(),
-                    val.as_ptr().cast(),
-                    val.len().try_into().unwrap(),
-                    ffi::VSDataTypeHint::Binary,
-                    append,
-                )),
-                Value::Utf8(val) => handle_set_error((self.api.mapSetData)(
-                    self.as_ptr(),
-                    key.as_ptr(),
-                    val.as_ptr().cast(),
-                    val.len().try_into().unwrap(),
-                    ffi::VSDataTypeHint::Utf8,
-                    append,
-                )),
-                Value::VideoNode(val) => {
-                    self.set_internal(self.api.mapSetNode, key, val.as_ptr(), append)
-                }
-                Value::AudioNode(val) => {
-                    self.set_internal(self.api.mapSetNode, key, val.as_ptr(), append)
-                }
-                Value::VideoFrame(val) => {
-                    self.set_internal(self.api.mapSetFrame, key, val.as_ptr(), append)
-                }
-                Value::AudioFrame(val) => {
-                    self.set_internal(self.api.mapSetFrame, key, val.as_ptr(), append)
-                }
-                Value::Function(val) => {
-                    self.set_internal(self.api.mapSetFunction, key, val.as_ptr(), append)
+                    t::Function => self.get_function(key, index).map(Value::Function),
+                    t::VideoNode => self.get_video_node(key, index).map(Value::VideoNode),
+                    t::AudioNode => self.get_audio_node(key, index).map(Value::AudioNode),
+                    t::VideoFrame => self.get_video_frame(key, index).map(Value::VideoFrame),
+                    t::AudioFrame => self.get_audio_frame(key, index).map(Value::AudioFrame),
                 }
             }
         }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get_int_saturated(&self, key: &KeyStr, index: i32) -> Result<i32, MapPropertyError> {
+            unsafe { self.get_internal(self.api.mapGetIntSaturated, key, index) }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get_int_array(&self, key: &KeyStr) -> Result<&[i64], MapPropertyError> {
+            let mut error = ffi::VSMapPropertyError::Success;
+            unsafe {
+                let size = self
+                    .num_elements(key)
+                    .ok_or(MapPropertyError::KeyNotFound)?;
+                let ptr = handle_get_error(
+                    (self.api.mapGetIntArray)(self.as_ptr(), key.as_ptr(), &raw mut error),
+                    error,
+                )?;
+
+                #[allow(clippy::cast_sign_loss)]
+                Ok(std::slice::from_raw_parts(ptr, size as _))
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get_float_saturated(
+            &self,
+            key: &KeyStr,
+            index: i32,
+        ) -> Result<f32, MapPropertyError> {
+            // safety: `self.handle` is a valid pointer
+            unsafe { self.get_internal(self.api.mapGetFloatSaturated, key, index) }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn get_float_array(&self, key: &KeyStr) -> Result<&[f64], MapPropertyError> {
+            let mut error = ffi::VSMapPropertyError::Success;
+            unsafe {
+                let size = self
+                    .num_elements(key)
+                    .ok_or(MapPropertyError::KeyNotFound)?;
+                let ptr = handle_get_error(
+                    (self.api.mapGetFloatArray)(self.as_ptr(), key.as_ptr(), &raw mut error),
+                    error,
+                )?;
+
+                #[allow(clippy::cast_sign_loss)]
+                Ok(std::slice::from_raw_parts(ptr, size as _))
+            }
+        }
+    };
+}
+
+macro_rules! map_write_methods {
+    () => {
+        pub fn clear(&mut self) {
+            // safety: `self.handle` is a valid pointer
+            unsafe { (self.api.clearMap)(self.as_ptr()) }
+        }
+
+        pub fn set_error(&mut self, msg: &CStr) {
+            // safety: `self.handle` and `msg` are valid pointers
+            unsafe { (self.api.mapSetError)(self.as_ptr(), msg.as_ptr()) }
+        }
+
+        pub fn delete_key(&mut self, key: &KeyStr) {
+            // safety: `self.handle` and `key` are valid pointers
+            unsafe { (self.api.mapDeleteKey)(self.as_ptr(), key.as_ptr()) };
+        }
+
+        // MARK: Set
+
+        /// # Panics
+        ///
+        /// Panics if the key exists or is invalid
+        pub fn set_empty(&mut self, key: &KeyStr, type_: ffi::VSPropertyType) {
+            // safety: `self.handle` is a valid pointer
+            let res = unsafe { (self.api.mapSetEmpty)(self.as_ptr(), key.as_ptr(), type_) };
+            assert!(res != 0);
+        }
+
+        unsafe fn set_internal<T>(
+            &mut self,
+            func: unsafe extern "system-unwind" fn(
+                *mut ffi::VSMap,
+                *const c_char,
+                T,
+                ffi::VSMapAppendMode,
+            ) -> c_int,
+            key: &KeyStr,
+            val: T,
+            append: ffi::VSMapAppendMode,
+        ) -> Result<(), MapPropertyError> {
+            handle_set_error(unsafe { func(self.as_ptr(), key.as_ptr(), val, append) })
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError::InvalidType`] if the `key`'s type is not the same with `val`
+        ///
+        /// # Panics
+        ///
+        /// Panic if the [`Value::Data`]'s or [`Value::Utf8`]'s len is larger than [`i32::MAX`]
+        pub fn set(
+            &mut self,
+            key: &KeyStr,
+            val: Value,
+            append: AppendMode,
+        ) -> Result<(), MapPropertyError> {
+            unsafe {
+                match val {
+                    Value::Int(val) => self.set_internal(self.api.mapSetInt, key, val, append),
+                    Value::Float(val) => self.set_internal(self.api.mapSetFloat, key, val, append),
+                    Value::Data(val) => handle_set_error((self.api.mapSetData)(
+                        self.as_ptr(),
+                        key.as_ptr(),
+                        val.as_ptr().cast(),
+                        val.len().try_into().unwrap(),
+                        ffi::VSDataTypeHint::Binary,
+                        append,
+                    )),
+                    Value::Utf8(val) => handle_set_error((self.api.mapSetData)(
+                        self.as_ptr(),
+                        key.as_ptr(),
+                        val.as_ptr().cast(),
+                        val.len().try_into().unwrap(),
+                        ffi::VSDataTypeHint::Utf8,
+                        append,
+                    )),
+                    Value::VideoNode(val) => {
+                        self.set_internal(self.api.mapSetNode, key, val.as_ptr(), append)
+                    }
+                    Value::AudioNode(val) => {
+                        self.set_internal(self.api.mapSetNode, key, val.as_ptr(), append)
+                    }
+                    Value::VideoFrame(val) => {
+                        self.set_internal(self.api.mapSetFrame, key, val.as_ptr(), append)
+                    }
+                    Value::AudioFrame(val) => {
+                        self.set_internal(self.api.mapSetFrame, key, val.as_ptr(), append)
+                    }
+                    Value::Function(val) => {
+                        self.set_internal(self.api.mapSetFunction, key, val.as_ptr(), append)
+                    }
+                }
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        ///
+        /// # Panics
+        ///
+        /// Panic if the `val.len()` is larger than [`i32::MAX`]
+        pub fn set_int_array(&mut self, key: &KeyStr, val: &[i64]) -> Result<(), MapPropertyError> {
+            unsafe {
+                handle_set_error((self.api.mapSetIntArray)(
+                    self.as_ptr(),
+                    key.as_ptr(),
+                    val.as_ptr(),
+                    val.len().try_into().unwrap(),
+                ))
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        ///
+        /// # Panics
+        ///
+        /// Panic if the `val.len()` is larger than [`i32::MAX`]
+        pub fn set_float_array(
+            &mut self,
+            key: &KeyStr,
+            val: &[f64],
+        ) -> Result<(), MapPropertyError> {
+            unsafe {
+                handle_set_error((self.api.mapSetFloatArray)(
+                    self.as_ptr(),
+                    key.as_ptr(),
+                    val.as_ptr(),
+                    val.len().try_into().unwrap(),
+                ))
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn consume_node(
+            &mut self,
+            key: &KeyStr,
+            node: impl Node,
+            append: AppendMode,
+        ) -> Result<(), MapPropertyError> {
+            let node = ManuallyDrop::new(node);
+            unsafe {
+                handle_set_error((self.api.mapConsumeNode)(
+                    self.as_ptr(),
+                    key.as_ptr(),
+                    node.as_ptr(),
+                    append,
+                ))
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn consume_frame(
+            &mut self,
+            key: &KeyStr,
+            frame: impl Frame,
+            append: AppendMode,
+        ) -> Result<(), MapPropertyError> {
+            let frame = ManuallyDrop::new(frame);
+            unsafe {
+                handle_set_error((self.api.mapConsumeFrame)(
+                    self.as_ptr(),
+                    key.as_ptr(),
+                    frame.as_ptr(),
+                    append,
+                ))
+            }
+        }
+
+        /// # Errors
+        ///
+        /// Return [`MapPropertyError`] if the underlying API does not success
+        pub fn consume_function(
+            &mut self,
+            key: &KeyStr,
+            function: Function,
+            append: AppendMode,
+        ) -> Result<(), MapPropertyError> {
+            let function = ManuallyDrop::new(function);
+            unsafe {
+                handle_set_error((self.api.mapConsumeFunction)(
+                    self.as_ptr(),
+                    key.as_ptr(),
+                    function.as_ptr(),
+                    append,
+                ))
+            }
+        }
+    };
+}
+
+impl MapRef<'_> {
+    map_read_methods!();
+}
+
+impl MapMut<'_> {
+    map_read_methods!();
+    map_write_methods!();
+}
+
+impl Map {
+    map_read_methods!();
+    map_write_methods!();
+
+    #[must_use]
+    pub fn as_ref(&self) -> MapRef<'_> {
+        unsafe { MapRef::from_ptr(self.handle, self.api) }
     }
 
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    ///
-    /// # Panics
-    ///
-    /// Panic if the `val.len()` is larger than [`i32::MAX`]
-    pub fn set_int_array(&mut self, key: &KeyStr, val: &[i64]) -> Result<(), MapPropertyError> {
-        unsafe {
-            handle_set_error((self.api.mapSetIntArray)(
-                self.as_ptr(),
-                key.as_ptr(),
-                val.as_ptr(),
-                val.len().try_into().unwrap(),
-            ))
-        }
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    ///
-    /// # Panics
-    ///
-    /// Panic if the `val.len()` is larger than [`i32::MAX`]
-    pub fn set_float_array(&mut self, key: &KeyStr, val: &[f64]) -> Result<(), MapPropertyError> {
-        unsafe {
-            handle_set_error((self.api.mapSetFloatArray)(
-                self.as_ptr(),
-                key.as_ptr(),
-                val.as_ptr(),
-                val.len().try_into().unwrap(),
-            ))
-        }
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn consume_node(
-        &mut self,
-        key: &KeyStr,
-        node: impl Node,
-        append: AppendMode,
-    ) -> Result<(), MapPropertyError> {
-        let node = ManuallyDrop::new(node);
-        unsafe {
-            handle_set_error((self.api.mapConsumeNode)(
-                self.as_ptr(),
-                key.as_ptr(),
-                node.as_ptr(),
-                append,
-            ))
-        }
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn consume_frame(
-        &mut self,
-        key: &KeyStr,
-        frame: impl Frame,
-        append: AppendMode,
-    ) -> Result<(), MapPropertyError> {
-        let frame = ManuallyDrop::new(frame);
-        unsafe {
-            handle_set_error((self.api.mapConsumeFrame)(
-                self.as_ptr(),
-                key.as_ptr(),
-                frame.as_ptr(),
-                append,
-            ))
-        }
-    }
-
-    /// # Errors
-    ///
-    /// Return [`MapPropertyError`] if the underlying API does not success
-    pub fn consume_function(
-        &mut self,
-        key: &KeyStr,
-        function: Function,
-        append: AppendMode,
-    ) -> Result<(), MapPropertyError> {
-        let function = ManuallyDrop::new(function);
-        unsafe {
-            handle_set_error((self.api.mapConsumeFunction)(
-                self.as_ptr(),
-                key.as_ptr(),
-                function.as_ptr(),
-                append,
-            ))
-        }
+    #[must_use]
+    pub fn as_mut(&mut self) -> MapMut<'_> {
+        unsafe { MapMut::from_ptr(self.as_ptr(), self.api) }
     }
 }
 
@@ -644,6 +758,23 @@ mod tests {
     use testresult::TestResult;
 
     use super::*;
+
+    #[test]
+    fn borrowed_views() -> TestResult {
+        let mut map = Map::default();
+        let key = crate::key!(c"values");
+        {
+            let mut view = map.as_mut();
+            view.reborrow().set_int_array(key, &[1, 2, 3])?;
+            assert_eq!(view.as_ref().get_int_array(key)?, &[1, 2, 3]);
+        }
+        let view = map.as_ref();
+        let copy = view;
+        assert_eq!(copy.get_int_array(key)?, &[1, 2, 3]);
+        map.as_mut().clear();
+        assert!(map.is_empty());
+        Ok(())
+    }
 
     #[test]
     fn clear() -> TestResult {

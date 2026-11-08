@@ -9,7 +9,7 @@ use vapoursynth4_rs::{
     declare_plugin,
     frame::{FrameContext, VideoFrame},
     key,
-    map::MapRef,
+    map::{MapMut, MapRef},
     node::{
         ActivationReason, Dependencies, Filter, FilterDependency, Node, RequestPattern, VideoNode,
     },
@@ -27,7 +27,7 @@ impl Filter for DumbFilter {
 
     fn create(
         input: MapRef,
-        output: MapRef,
+        mut output: MapMut,
         _data: Option<Box<Self::FilterData>>,
         mut core: CoreRef,
     ) -> Result<(), Self::Error> {
@@ -58,7 +58,7 @@ impl Filter for DumbFilter {
         }];
 
         core.create_video_filter(
-            output,
+            &mut output,
             c"Invert",
             vi,
             Box::new(filter),
@@ -112,7 +112,7 @@ impl Filter for DumbFilter {
                         dst_p = dst_p.wrapping_offset(dst_stride);
                     }
                 }
-                return Ok(Some(dst));
+                return Ok(Some(dst.freeze()));
             }
             _ => {}
         }

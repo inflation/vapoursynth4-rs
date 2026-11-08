@@ -9,7 +9,7 @@ use crate::{
     api::Api,
     core::CoreRef,
     frame::{Frame, FrameContext},
-    map::MapRef,
+    map::{MapMut, MapRef},
     utils::ToCString,
 };
 
@@ -27,7 +27,7 @@ pub trait FilterExtern: Filter {
             let api = Api::from_ptr(vsapi);
 
             let input = MapRef::from_ptr(in_, api);
-            let mut output = MapRef::from_ptr(out, api);
+            let mut output = MapMut::from_ptr(out, api);
             let core = CoreRef::from_ptr(core, api);
             let data = if user_data.is_null() {
                 None
@@ -36,7 +36,7 @@ pub trait FilterExtern: Filter {
             };
 
             match std::panic::catch_unwind(AssertUnwindSafe(|| {
-                Self::create(input, output, data, core)
+                Self::create(input, output.reborrow(), data, core)
             })) {
                 Ok(Err(e)) => {
                     output.set_error(e.as_ref());

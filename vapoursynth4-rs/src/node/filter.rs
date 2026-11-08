@@ -7,7 +7,7 @@ use crate::{
     core::CoreRef,
     ffi,
     frame::{Frame, FrameContext},
-    map::MapRef,
+    map::{MapMut, MapRef},
     node::FilterMode,
 };
 
@@ -36,7 +36,7 @@ where
     /// The error message will be passed to `VapourSynth`.
     fn create(
         input: MapRef,
-        output: MapRef,
+        output: MapMut,
         data: Option<Box<Self::FilterData>>,
         core: CoreRef,
     ) -> Result<(), Self::Error>;

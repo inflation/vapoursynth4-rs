@@ -20,10 +20,11 @@ use crate::{
     api::Api,
     ffi,
     frame::{
-        AudioFormat, AudioFrame, FormatName, Frame, VideoFormat, VideoFrame, internal::FrameFromPtr,
+        AudioFormat, AudioFrame, AudioFrameMut, FormatName, Frame, VideoFormat, VideoFrame,
+        VideoFrameMut,
     },
     function::Function,
-    map::{Map, MapRef},
+    map::{Map, MapMut},
     node::{Dependencies, Filter, internal::FilterExtern},
     plugin::{Plugin, Plugins},
 };
@@ -116,7 +117,7 @@ impl Core {
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_video_filter<F: Filter>(
         &mut self,
-        out: MapRef,
+        out: &mut MapMut,
         name: &CStr,
         info: &VideoInfo,
         filter: Box<F>,
@@ -144,7 +145,7 @@ impl Core {
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_audio_filter<F: Filter>(
         &mut self,
-        out: &mut MapRef,
+        out: &mut MapMut,
         name: &CStr,
         info: &AudioInfo,
         filter: F,
@@ -174,7 +175,7 @@ impl Core {
         width: i32,
         height: i32,
         prop_src: Option<&VideoFrame>,
-    ) -> VideoFrame {
+    ) -> VideoFrameMut {
         unsafe {
             let ptr = (self.api.newVideoFrame)(
                 format,
@@ -183,7 +184,7 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
                 self.as_ptr(),
             );
-            VideoFrame::from_ptr(ptr, self.api)
+            VideoFrameMut::from_unique_ptr(ptr, self.api)
         }
     }
 
@@ -196,7 +197,7 @@ impl Core {
         plane_src: &[*const ffi::VSFrame],
         planes: &[i32],
         prop_src: Option<&VideoFrame>,
-    ) -> VideoFrame {
+    ) -> VideoFrameMut {
         unsafe {
             let ptr = (self.api.newVideoFrame2)(
                 format,
@@ -207,7 +208,7 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
                 self.as_ptr(),
             );
-            VideoFrame::from_ptr(ptr, self.api)
+            VideoFrameMut::from_unique_ptr(ptr, self.api)
         }
     }
 
@@ -217,7 +218,7 @@ impl Core {
         format: &AudioFormat,
         num_samples: i32,
         prop_src: Option<&AudioFrame>,
-    ) -> AudioFrame {
+    ) -> AudioFrameMut {
         unsafe {
             let ptr = (self.api.newAudioFrame)(
                 format,
@@ -225,7 +226,7 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
                 self.as_ptr(),
             );
-            AudioFrame::from_ptr(ptr, self.api)
+            AudioFrameMut::from_unique_ptr(ptr, self.api)
         }
     }
 
@@ -237,7 +238,7 @@ impl Core {
         channel_src: &[*const ffi::VSFrame],
         channels: &[i32],
         prop_src: Option<&AudioFrame>,
-    ) -> AudioFrame {
+    ) -> AudioFrameMut {
         unsafe {
             let ptr = (self.api.newAudioFrame2)(
                 format,
@@ -247,14 +248,14 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
                 self.as_ptr(),
             );
-            AudioFrame::from_ptr(ptr, self.api)
+            AudioFrameMut::from_unique_ptr(ptr, self.api)
         }
     }
 
     #[must_use]
-    pub fn copy_frame<F: Frame>(&self, frame: &F) -> F {
+    pub fn copy_frame<F: Frame>(&self, frame: &F) -> F::Writable {
         unsafe {
-            F::from_ptr(
+            F::writable_from_ptr(
                 (self.api.copyFrame)(frame.as_ptr(), self.as_ptr()),
                 self.api,
             )

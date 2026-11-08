@@ -4,7 +4,7 @@ use vapoursynth4_rs::{
     core::CoreRef,
     frame::{FrameContext, VideoFrame},
     key,
-    map::{AppendMode, MapRef, Value},
+    map::{AppendMode, MapMut, MapRef, Value},
     node::{
         ActivationReason, Dependencies, Filter, FilterDependency, Node, RequestPattern, VideoNode,
     },
@@ -24,7 +24,7 @@ impl Filter for DitherFilter {
 
     fn create(
         input: MapRef,
-        output: MapRef,
+        mut output: MapMut,
         _data: Option<Box<Self::FilterData>>,
         mut core: CoreRef,
     ) -> Result<(), Self::Error> {
@@ -75,7 +75,7 @@ impl Filter for DitherFilter {
         }];
 
         core.create_video_filter(
-            output,
+            &mut output,
             c"Depth",
             &vi,
             Box::new(filter),
@@ -105,7 +105,7 @@ impl Filter for DitherFilter {
 
                 // Do whatever frame processing here, in the new bit depth.
 
-                return Ok(Some(dst));
+                return Ok(Some(dst.freeze()));
             }
             _ => {}
         }
