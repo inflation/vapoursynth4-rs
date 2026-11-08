@@ -35,34 +35,9 @@ jobs:
       - name: Install VapourSynth
         shell: bash
         run: scripts/install-vs.sh
-      - name: Install Vulkan headers and Lavapipe on Linux
-        if: runner.os == 'Linux'
-        run: bash scripts/install-vulkan-linux.sh
-      - name: Install Vulkan headers and Lavapipe on macOS
-        if: runner.os == 'macOS'
-        run: |
-          brew install vulkan-headers vulkan-loader vulkan-tools
-          cd "$RUNNER_TEMP"
-          curl -fsSLO https://github.com/rerun-io/lavapipe-build/releases/download/v0.4.0/lavapipe-macos-arm64.tar.gz
-          echo "50c14d456e2212736d8a3cf2f2629da4e027b9fb50863604211cc6de048fcb40  lavapipe-macos-arm64.tar.gz" | shasum -a 256 -c -
-          tar -xzf lavapipe-macos-arm64.tar.gz
-          driver="$RUNNER_TEMP/lavapipe-macos-arm64/lvp_icd.aarch64.json"
-          test -f "$driver"
-          VK_DRIVER_FILES="$driver" vulkaninfo --summary
-          echo "VK_DRIVER_FILES=$driver" >> "$GITHUB_ENV"
-          echo "DYLD_LIBRARY_PATH=$(brew --prefix vulkan-loader)/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}" >> "$GITHUB_ENV"
-      - name: Install Vulkan SDK and Lavapipe on Windows
-        if: runner.os == 'Windows'
-        uses: jakoch/install-vulkan-sdk-action@7fe84289ddbf750f7eff9f8e4588e600e1dd06c8 # v1.8.1
-        with:
-          vulkan_version: '1.4.341.0'
-          install_lavapipe: true
-      - name: Select Lavapipe on Windows
-        if: runner.os == 'Windows'
-        run: |
-          $driver = Get-ChildItem C:\lavapipe -Recurse -Filter lvp_icd.x86_64.json | Select-Object -First 1
-          if (-not $driver) { throw 'Lavapipe driver manifest not found' }
-          "VK_DRIVER_FILES=$($driver.FullName)" >> $env:GITHUB_ENV
+      - name: Install Vulkan headers and Lavapipe
+        shell: bash
+        run: bash scripts/install-vulkan.sh
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Build
@@ -120,7 +95,7 @@ jobs:
         with:
           components: rust-src
       - name: Install Vulkan headers and Lavapipe
-        run: bash scripts/install-vulkan-linux.sh
+        run: bash scripts/install-vulkan.sh
       # Cached separately from the Rust cache: this tree depends only on the
       # build script, not on Cargo.toml or the toolchain, and keying it off those
       # threw the whole C++ build away on every version bump. No restore-keys --
