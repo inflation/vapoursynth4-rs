@@ -17,7 +17,8 @@ case "$(uname -s)" in
         echo "DYLD_LIBRARY_PATH=$(brew --prefix vulkan-loader)/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}" >> "$GITHUB_ENV"
         ;;
     MINGW*|MSYS*|CYGWIN*)
-        MSYS2_ARG_CONV_EXCL='*' pwsh -NoLogo -NoProfile -NonInteractive -Command "$(cat <<'POWERSHELL'
+        installer_script="$RUNNER_TEMP/install-vulkan.ps1"
+        cat > "$installer_script" <<'POWERSHELL'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
@@ -56,7 +57,7 @@ if ($LASTEXITCODE -ne 0) { throw "vulkaninfo exited with $LASTEXITCODE" }
 "VK_DRIVER_FILES=$driver" >> $env:GITHUB_ENV
 "$sdk/Bin" >> $env:GITHUB_PATH
 POWERSHELL
-)"
+        pwsh -NoLogo -NoProfile -NonInteractive -File "$(cygpath -w "$installer_script")"
         exit
         ;;
     *)
