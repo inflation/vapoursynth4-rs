@@ -8,7 +8,7 @@ use std::{
     ffi::CStr,
     marker::PhantomData,
     mem::MaybeUninit,
-    ops::{Deref, DerefMut},
+    ops::Deref,
     ptr::{NonNull, null_mut},
 };
 
@@ -20,74 +20,71 @@ use crate::{
     api::Api,
     ffi,
     frame::{
-        AudioFormat, AudioFrame, FormatName, Frame, VideoFormat, VideoFrame, internal::FrameFromPtr,
+        AudioFormat, AudioFrame, AudioFrameMut, FormatName, Frame, VideoFormat, VideoFrame,
+        VideoFrameMut,
     },
     function::Function,
-    map::{Map, MapRef},
+    map::{Map, MapMut},
     node::{Dependencies, Filter, internal::FilterExtern},
     plugin::{Plugin, Plugins},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// A borrowed core supplied by `VapourSynth`.
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CoreRef<'c> {
-    handle: *const ffi::VSCore,
-    api: Api,
+    handle: CoreHandle,
     marker: PhantomData<&'c ()>,
 }
 
 impl CoreRef<'_> {
+    // The core must remain alive for the lifetime of the borrow.
     #[must_use]
     pub(crate) unsafe fn from_ptr(ptr: *const ffi::VSCore, api: Api) -> Self {
         Self {
-            handle: ptr.cast_mut(),
-            api,
+            handle: CoreHandle { handle: ptr, api },
             marker: PhantomData,
         }
     }
 }
 
-impl AsRef<Core> for CoreRef<'_> {
-    fn as_ref(&self) -> &Core {
-        unsafe { &*std::ptr::from_ref(self).cast() }
+impl AsRef<CoreHandle> for CoreRef<'_> {
+    fn as_ref(&self) -> &CoreHandle {
+        &self.handle
     }
 }
 
 impl Deref for CoreRef<'_> {
-    type Target = Core;
+    type Target = CoreHandle;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { &*std::ptr::from_ref(self).cast() }
-    }
-}
-
-impl DerefMut for CoreRef<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *std::ptr::from_mut(self).cast() }
+        &self.handle
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Core {
+    handle: CoreHandle,
+}
+
+impl Deref for Core {
+    type Target = CoreHandle;
+
+    fn deref(&self) -> &Self::Target {
+        &self.handle
+    }
+}
+
+/// Operations available on both owned and borrowed cores.
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct CoreHandle {
     handle: *const ffi::VSCore,
     api: Api,
 }
 
-impl Core {
+impl CoreHandle {
     #[must_use]
     pub fn as_ptr(&self) -> *mut ffi::VSCore {
         self.handle.cast_mut()
-    }
-
-    pub fn set_max_cache_size(&mut self, size: i64) {
-        unsafe {
-            (self.api.setMaxCacheSize)(size, self.as_ptr());
-        }
-    }
-
-    pub fn set_thread_count(&mut self, count: i32) {
-        unsafe {
-            (self.api.setThreadCount)(count, self.as_ptr());
-        }
     }
 
     #[must_use]
@@ -115,8 +112,8 @@ impl Core {
     ///
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_video_filter<F: Filter>(
-        &mut self,
-        out: MapRef,
+        &self,
+        out: &mut MapMut,
         name: &CStr,
         info: &VideoInfo,
         filter: Box<F>,
@@ -143,8 +140,8 @@ impl Core {
     ///
     /// Panic if the `dependencies` has more item than [`i32::MAX`]
     pub fn create_audio_filter<F: Filter>(
-        &mut self,
-        out: &mut MapRef,
+        &self,
+        out: &mut MapMut,
         name: &CStr,
         info: &AudioInfo,
         filter: F,
@@ -174,7 +171,7 @@ impl Core {
         width: i32,
         height: i32,
         prop_src: Option<&VideoFrame>,
-    ) -> VideoFrame {
+    ) -> VideoFrameMut {
         unsafe {
             let ptr = (self.api.newVideoFrame)(
                 format,
@@ -183,12 +180,21 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
                 self.as_ptr(),
             );
-            VideoFrame::from_ptr(ptr, self.api)
+            VideoFrameMut::from_unique_ptr(ptr, self.api)
         }
     }
 
+    /// Calls `VapourSynth`'s video plane assembly without validation.
+    ///
+    /// # Safety
+    ///
+    /// The destination format and size must be valid. Both arrays must contain at
+    /// least `format.num_planes` entries. Each non-null source must be a live
+    /// video frame with a valid plane index, matching dimensions and sample
+    /// storage, and compatible residency and device. Frames must be valid for
+    /// this core's API.
     #[must_use]
-    pub fn new_video_frame2(
+    pub unsafe fn new_video_frame2(
         &self,
         format: &VideoFormat,
         width: i32,
@@ -196,7 +202,7 @@ impl Core {
         plane_src: &[*const ffi::VSFrame],
         planes: &[i32],
         prop_src: Option<&VideoFrame>,
-    ) -> VideoFrame {
+    ) -> VideoFrameMut {
         unsafe {
             let ptr = (self.api.newVideoFrame2)(
                 format,
@@ -207,7 +213,7 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
                 self.as_ptr(),
             );
-            VideoFrame::from_ptr(ptr, self.api)
+            VideoFrameMut::from_unique_ptr(ptr, self.api)
         }
     }
 
@@ -217,7 +223,7 @@ impl Core {
         format: &AudioFormat,
         num_samples: i32,
         prop_src: Option<&AudioFrame>,
-    ) -> AudioFrame {
+    ) -> AudioFrameMut {
         unsafe {
             let ptr = (self.api.newAudioFrame)(
                 format,
@@ -225,19 +231,27 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
                 self.as_ptr(),
             );
-            AudioFrame::from_ptr(ptr, self.api)
+            AudioFrameMut::from_unique_ptr(ptr, self.api)
         }
     }
 
+    /// Calls `VapourSynth`'s audio channel assembly without validation.
+    ///
+    /// # Safety
+    ///
+    /// The destination format and sample count must be valid. Both arrays must
+    /// contain at least `format.num_channels` entries. Each non-null source must
+    /// be a live audio frame with a valid channel index and matching sample
+    /// storage and frame length. Frames must be valid for this core's API.
     #[must_use]
-    pub fn new_audio_frame2(
+    pub unsafe fn new_audio_frame2(
         &self,
         format: &AudioFormat,
         num_samples: i32,
         channel_src: &[*const ffi::VSFrame],
         channels: &[i32],
         prop_src: Option<&AudioFrame>,
-    ) -> AudioFrame {
+    ) -> AudioFrameMut {
         unsafe {
             let ptr = (self.api.newAudioFrame2)(
                 format,
@@ -247,20 +261,21 @@ impl Core {
                 prop_src.map_or(null_mut(), |f| f.as_ptr().cast()),
                 self.as_ptr(),
             );
-            AudioFrame::from_ptr(ptr, self.api)
+            AudioFrameMut::from_unique_ptr(ptr, self.api)
         }
     }
 
     #[must_use]
-    pub fn copy_frame<F: Frame>(&self, frame: &F) -> F {
+    pub fn copy_frame<F: Frame>(&self, frame: &F) -> F::Writable {
         unsafe {
-            F::from_ptr(
+            F::writable_from_ptr(
                 (self.api.copyFrame)(frame.as_ptr(), self.as_ptr()),
                 self.api,
             )
         }
     }
 
+    /// Returns the format if `VapourSynth` accepts the requested parameters.
     #[must_use]
     pub fn query_video_format(
         &self,
@@ -269,10 +284,10 @@ impl Core {
         bits_per_sample: i32,
         subsampling_w: i32,
         subsampling_h: i32,
-    ) -> VideoFormat {
+    ) -> Option<VideoFormat> {
         unsafe {
             let mut format = MaybeUninit::uninit();
-            (self.api.queryVideoFormat)(
+            let success = (self.api.queryVideoFormat)(
                 format.as_mut_ptr(),
                 color_family,
                 sample_type,
@@ -281,7 +296,7 @@ impl Core {
                 subsampling_h,
                 self.as_ptr(),
             );
-            format.assume_init()
+            (success != 0).then(|| format.assume_init())
         }
     }
 
@@ -291,27 +306,28 @@ impl Core {
         if 0 == unsafe { (self.api.getVideoFormatName)(format, buffer.as_mut_ptr().cast()) } {
             None
         } else {
-            Some(buffer.to_string())
+            buffer.as_str().map(str::to_owned)
         }
     }
 
+    /// Returns the format if `VapourSynth` accepts the requested parameters.
     #[must_use]
     pub fn query_audio_format(
         &self,
         sample_type: SampleType,
         bits_per_sample: i32,
         channel_layout: u64,
-    ) -> AudioFormat {
+    ) -> Option<AudioFormat> {
         unsafe {
             let mut format = MaybeUninit::uninit();
-            (self.api.queryAudioFormat)(
+            let success = (self.api.queryAudioFormat)(
                 format.as_mut_ptr(),
                 sample_type,
                 bits_per_sample,
                 channel_layout,
                 self.as_ptr(),
             );
-            format.assume_init()
+            (success != 0).then(|| format.assume_init())
         }
     }
 
@@ -321,7 +337,7 @@ impl Core {
         if 0 == unsafe { (self.api.getAudioFormatName)(format, buffer.as_mut_ptr().cast()) } {
             None
         } else {
-            Some(buffer.to_string())
+            buffer.as_str().map(str::to_owned)
         }
     }
 
@@ -346,17 +362,18 @@ impl Core {
         }
     }
 
+    /// Returns the format if `VapourSynth` recognizes the ID.
     #[must_use]
-    pub fn get_video_format_by_id(&self, id: u32) -> VideoFormat {
+    pub fn get_video_format_by_id(&self, id: u32) -> Option<VideoFormat> {
         unsafe {
             let mut format = MaybeUninit::uninit();
-            (self.api.getVideoFormatByID)(format.as_mut_ptr(), id, self.as_ptr());
-            format.assume_init()
+            let success = (self.api.getVideoFormatByID)(format.as_mut_ptr(), id, self.as_ptr());
+            (success != 0).then(|| format.assume_init())
         }
     }
 
     pub fn create_function<T>(
-        &mut self,
+        &self,
         func: ffi::VSPublicFunction,
         data: Box<T>,
         free: ffi::VSFreeFunctionData,
@@ -390,29 +407,11 @@ impl Core {
         Plugins::new(self)
     }
 
-    pub fn log(&mut self, level: ffi::VSMessageType, msg: &CStr) {
+    pub fn log(&self, level: ffi::VSMessageType, msg: &CStr) {
         unsafe {
             (self.api.logMessage)(level, msg.as_ptr(), self.as_ptr());
         }
     }
-}
-
-impl Drop for Core {
-    fn drop(&mut self) {
-        unsafe {
-            (self.api.freeCore)(self.handle.cast_mut());
-        }
-    }
-}
-
-// MARK: Helper
-
-impl Core {
-    unsafe fn new_with(flags: i32, api: Api) -> Self {
-        let core = unsafe { (api.createCore)(flags) };
-        Self { handle: core, api }
-    }
-
     #[must_use]
     pub fn api(&self) -> Api {
         self.api
@@ -424,6 +423,33 @@ impl Core {
             let ptr = (self.api.createMap)();
             Map::from_ptr(ptr, self.api)
         }
+    }
+}
+
+impl Core {
+    unsafe fn new_with(flags: i32, api: Api) -> Self {
+        let handle = unsafe { (api.createCore)(flags) };
+        Self {
+            handle: CoreHandle { handle, api },
+        }
+    }
+
+    pub fn set_max_cache_size(&mut self, size: i64) {
+        unsafe {
+            (self.api.setMaxCacheSize)(size, self.as_ptr());
+        }
+    }
+
+    pub fn set_thread_count(&mut self, count: i32) {
+        unsafe {
+            (self.api.setThreadCount)(count, self.as_ptr());
+        }
+    }
+}
+
+impl Drop for Core {
+    fn drop(&mut self) {
+        unsafe { (self.api.freeCore)(self.as_ptr()) }
     }
 }
 
@@ -481,6 +507,49 @@ impl<S: State> CoreBuilder<S> {
 #[cfg(feature = "link-vs")]
 mod tests {
     use super::*;
+
+    #[test]
+    fn format_queries_check_native_results() {
+        let core = Core::builder().disable_auto_loading().build();
+        assert!(
+            core.query_video_format(ColorFamily::Gray, SampleType::Integer, 0, 0, 0)
+                .is_none()
+        );
+        assert!(
+            core.query_audio_format(SampleType::Integer, 16, 0)
+                .is_none()
+        );
+        assert!(core.get_video_format_by_id(u32::MAX).is_none());
+
+        let video = core
+            .query_video_format(ColorFamily::Gray, SampleType::Integer, 8, 0, 0)
+            .unwrap();
+        let id = core.query_video_format_id(ColorFamily::Gray, SampleType::Integer, 8, 0, 0);
+        let preset = core.get_video_format_by_id(id).unwrap();
+        assert_eq!(video.bits_per_sample, 8);
+        assert_eq!(core.get_video_format_name(&video).as_deref(), Some("Gray8"));
+        assert_eq!(preset.bits_per_sample, video.bits_per_sample);
+        assert_eq!(preset.color_family, video.color_family);
+
+        let audio = core.query_audio_format(SampleType::Integer, 16, 3).unwrap();
+        assert_eq!(audio.bits_per_sample, 16);
+        assert_eq!(audio.num_channels, 2);
+        assert_ne!(core.get_audio_format_name(&audio).unwrap(), "");
+    }
+
+    #[test]
+    fn borrowed_core_leaves_owner_alive() {
+        let core = Core::builder()
+            .disable_auto_loading()
+            .thread_count(2)
+            .build();
+        {
+            let borrowed = unsafe { CoreRef::from_ptr(core.as_ptr(), core.api()) };
+            assert_eq!(borrowed.as_ptr(), core.as_ptr());
+            assert_eq!(borrowed.get_info().num_threads, 2);
+        }
+        assert_eq!(core.get_info().num_threads, 2);
+    }
 
     #[test]
     fn builder() {

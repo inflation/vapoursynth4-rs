@@ -9,7 +9,7 @@ use vapoursynth4_rs::{
     declare_plugin,
     frame::{FrameContext, VideoFrame},
     key,
-    map::MapRef,
+    map::{MapMut, MapRef},
     node::{
         ActivationReason, Dependencies, Filter, FilterDependency, Node, RequestPattern, VideoNode,
     },
@@ -27,9 +27,9 @@ impl Filter for DumbFilter {
 
     fn create(
         input: MapRef,
-        output: MapRef,
-        _data: Option<Box<Self::FilterData>>,
-        mut core: CoreRef,
+        mut output: MapMut,
+        _data: Option<&Self::FilterData>,
+        core: CoreRef,
     ) -> Result<(), Self::Error> {
         let Ok(node) = input.get_video_node(key!(c"clip"), 0) else {
             return Err(c"Failed to get clip");
@@ -58,7 +58,7 @@ impl Filter for DumbFilter {
         }];
 
         core.create_video_filter(
-            output,
+            &mut output,
             c"Invert",
             vi,
             Box::new(filter),
@@ -112,7 +112,7 @@ impl Filter for DumbFilter {
                         dst_p = dst_p.wrapping_offset(dst_stride);
                     }
                 }
-                return Ok(Some(dst));
+                return Ok(Some(dst.freeze()));
             }
             _ => {}
         }
@@ -139,7 +139,7 @@ declare_plugin!(
 #[cfg(test)]
 mod tests {
     use testresult::TestResult;
-    use vapoursynth4_rs::sciprt::Script;
+    use vapoursynth4_rs::{node::Node, sciprt::Script};
 
     #[test]
     fn test_vsscript_works() -> TestResult {
@@ -147,7 +147,11 @@ mod tests {
         vss.evaluate_file(c"test.vpy")?;
         let node = vss.get_output(0)?;
         let vn = node.as_video().ok_or("Expected video node")?;
-        let _info = vn.info();
+        let frame = vn
+            .get_frame(0)
+            .map_err(|error| error.to_string_lossy().into_owned())?;
+        assert_eq!(unsafe { frame.plane(0).read() }, !42);
+        assert_eq!(frame.frame_width(0), 16);
 
         Ok(())
     }

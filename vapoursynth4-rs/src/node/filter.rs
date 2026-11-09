@@ -1,20 +1,18 @@
 use std::{
     ffi::{CStr, c_void},
-    ptr::null_mut,
+    ptr::{from_ref, null_mut},
 };
 
 use crate::{
     core::CoreRef,
     ffi,
     frame::{Frame, FrameContext},
-    map::MapRef,
+    map::{MapMut, MapRef},
     node::FilterMode,
 };
 
-pub trait Filter
-where
-    Self: Sized + std::panic::RefUnwindSafe,
-{
+/// A filter instance that `VapourSynth` can move between worker threads and call concurrently.
+pub trait Filter: Sized + Send + Sync + std::panic::RefUnwindSafe + 'static {
     /// Bitmask of [`ffi::VSFilterFlags`] used when creating video nodes.
     /// GPU output must agree with [`Self::RETURN_TYPE`]; defaults to CPU output.
     #[cfg(feature = "vs-43")]
@@ -24,7 +22,8 @@ where
     /// Filter error that can turned into a [`&CStr`](std::ffi::CStr)
     type Error: AsRef<CStr>;
     type FrameType: Frame;
-    type FilterData; // TODO: Ensure Send + Sync when FILTER_MODE is Parallel
+    /// Shared registration data available to each call to [`Self::create`].
+    type FilterData: Sync + 'static;
 
     const NAME: &'static CStr;
     const ARGS: &'static CStr;
@@ -36,8 +35,8 @@ where
     /// The error message will be passed to `VapourSynth`.
     fn create(
         input: MapRef,
-        output: MapRef,
-        data: Option<Box<Self::FilterData>>,
+        output: MapMut,
+        data: Option<&Self::FilterData>,
         core: CoreRef,
     ) -> Result<(), Self::Error>;
 
@@ -60,15 +59,18 @@ where
 }
 
 pub struct FilterRegister<F: Filter> {
-    data: Option<F::FilterData>,
+    data: Option<&'static F::FilterData>,
 }
 
 impl<F: Filter> FilterRegister<F> {
-    pub fn new(data: Option<F::FilterData>) -> Self {
+    #[must_use]
+    pub fn new(data: Option<&'static F::FilterData>) -> Self {
         Self { data }
     }
 
     /// # Safety
+    ///
+    /// Both pointers must be valid for a `VapourSynth` plugin registration call.
     pub unsafe fn register(self, plugin: *mut ffi::VSPlugin, vspapi: *const ffi::VSPLUGINAPI) {
         use super::internal::FilterExtern;
 
@@ -79,7 +81,7 @@ impl<F: Filter> FilterRegister<F> {
                 F::RETURN_TYPE.as_ptr(),
                 F::filter_create,
                 self.data
-                    .map_or(null_mut(), |d| Box::into_raw(Box::new(d)).cast()),
+                    .map_or(null_mut(), |data| from_ref(data).cast_mut().cast()),
                 plugin,
             )
         };

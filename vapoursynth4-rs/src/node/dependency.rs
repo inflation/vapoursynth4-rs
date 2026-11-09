@@ -19,14 +19,6 @@ impl Dependencies {
     }
 }
 
-impl<const N: usize> From<[FilterDependency; N]> for &Dependencies {
-    fn from(deps: [FilterDependency; N]) -> Self {
-        unsafe {
-            &*(std::ptr::from_ref::<[FilterDependency]>(deps.as_slice()) as *const Dependencies)
-        }
-    }
-}
-
 impl Deref for Dependencies {
     type Target = [FilterDependency];
 
