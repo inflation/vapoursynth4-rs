@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-rs-v0.5.1...vapoursynth4-rs-v0.6.0)
+
+### ⛰️ Features
+
+- Add Vulkan and VSScript 4.4 APIs - ([e41ebc7](https://github.com/inflation/vapoursynth4-rs/commit/e41ebc7da800507d39875732daa8fa073baabd05))
+- Update API to VapourSynth R80 - ([4dd754a](https://github.com/inflation/vapoursynth4-rs/commit/4dd754aecc3630cf911f5c10abc922ec35d4eddf))
+
+### 🐛 Bug Fixes
+
+- Transfer core ownership to VSScript - ([14f25ac](https://github.com/inflation/vapoursynth4-rs/commit/14f25acb84c83a1208ae4b161ba3f3a3943f235f))
+- Check native format query results - ([6b02eb0](https://github.com/inflation/vapoursynth4-rs/commit/6b02eb0df25f1ee6f6ffd12f8af87373f8c50f6d))
+- Require unsafe for raw frame assembly - ([8fc3670](https://github.com/inflation/vapoursynth4-rs/commit/8fc3670d4058f6f6a2a981bb0311cf1550cd3243))
+- Borrow filter registration data across calls - ([04212e5](https://github.com/inflation/vapoursynth4-rs/commit/04212e5eabd14a33de9d3019f7540f76fe699c96))
+- Make Rust filter callbacks safe to invoke - ([e9c02e2](https://github.com/inflation/vapoursynth4-rs/commit/e9c02e2ad140cce88f2395ac1dbee2e1579e89c5))
+- Separate borrowed cores from ownership - ([682d1f7](https://github.com/inflation/vapoursynth4-rs/commit/682d1f736d6f5b81fd7de83b67a7a8718bbacac0))
+- Enforce exclusive map and frame mutation - ([ed76e9a](https://github.com/inflation/vapoursynth4-rs/commit/ed76e9a2ee0d685375bb2d52997dc3ff55dbf9db))
+- Prevent cloning owned scripts - ([1ac4fcf](https://github.com/inflation/vapoursynth4-rs/commit/1ac4fcf287e7bae4bbe9dae63ce96f1d7faf65c5))
+
+### 🚜 Refactor
+
+- Name the shared core handle and keep tests internal - ([bcbbb80](https://github.com/inflation/vapoursynth4-rs/commit/bcbbb8056453364fc8753cd7bcda52607207e5e1))
+
+### 🧪 Testing
+
+- Cover native wrappers and fix exposed FFI bugs - ([ce90536](https://github.com/inflation/vapoursynth4-rs/commit/ce905366a6a65e9a0a015eb0406aadffd7e609db))
+- Cover audio outputs and native video filter creation - ([a259a26](https://github.com/inflation/vapoursynth4-rs/commit/a259a26783c44b009f4fdc59cd406eb80b4bef5f))
+- Cover Vulkan residency in Codecov - ([9af615c](https://github.com/inflation/vapoursynth4-rs/commit/9af615c6c39be774a20b2e45edd9f1a421a5edf6))
+
+### ⚙️ Miscellaneous Tasks
+
+- Exercise Vulkan with Mesa Lavapipe - ([ead1766](https://github.com/inflation/vapoursynth4-rs/commit/ead1766ccf0b2a33f9b72948d9dde763e173fd5d))
+
+
 - Bind the R80 Vulkan API behind `vulkan`, using Ash Vulkan types.
 - Add VSScript API 4.4 and GPU-aware output and variable accessors.
 
