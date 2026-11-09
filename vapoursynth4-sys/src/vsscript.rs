@@ -35,14 +35,22 @@ use std::ffi::{c_char, c_int};
 use super::{VSAPI, VSCore, VSMap, VSNode, opaque_struct, vs_make_version};
 
 pub const VSSCRIPT_API_MAJOR: u16 = 4;
-pub const VSSCRIPT_API_MINOR: u16 = if cfg!(feature = "vsscript-43") {
-    3
-} else if cfg!(feature = "vsscript-42") {
-    2
-} else {
-    1
+pub const VSSCRIPT_API_MINOR: u16 = core::cfg_select! {
+    feature = "vsscript-44" => 4,
+    feature = "vsscript-43" => 3,
+    feature = "vsscript-42" => 2,
+    _ => 1,
 };
 pub const VSSCRIPT_API_VERSION: i32 = vs_make_version(VSSCRIPT_API_MAJOR, VSSCRIPT_API_MINOR);
+
+/// Flags for API 4.4 script output and variable accessors.
+#[cfg(feature = "vsscript-44")]
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum VSScriptGetFlags {
+    /// Preserve GPU residency instead of downloading nodes or rejecting GPU frames.
+    AllowGPUResident = 1,
+}
 
 opaque_struct!(
     /// A script environment. All evaluation and communication with evaluated scripts happens
@@ -153,6 +161,9 @@ pub struct VSSCRIPTAPI {
     ///
     /// * `dst` - Map where the variable’s value will be placed, with the key name.
     ///
+    /// GPU node variables are downloaded; GPU frame variables fail. Use
+    /// `getVariableEx` with `AllowGPUResident` to preserve GPU residency.
+    ///
     /// Returns non-zero on error.
     pub getVariable: unsafe extern "system-unwind" fn(
         handle: *mut VSScript,
@@ -182,6 +193,8 @@ pub struct VSSCRIPTAPI {
     ///
     /// The returned node has its reference count incremented by one.
     ///
+    /// GPU outputs are automatically downloaded, so returned frames are CPU readable.
+    ///
     /// Returns `NULL` if there is no node at the requested index.
     pub getOutputNode:
         unsafe extern "system-unwind" fn(handle: *mut VSScript, index: c_int) -> *mut VSNode,
@@ -189,6 +202,8 @@ pub struct VSSCRIPTAPI {
     /// in the script must have been marked for output with the requested `index`.
     ///
     /// The returned node has its reference count incremented by one.
+    ///
+    /// GPU outputs are automatically downloaded, so returned frames are CPU readable.
     ///
     /// Returns `NULL` if there is no alpha node at the requested index.
     pub getOutputAlphaNode:
@@ -228,6 +243,48 @@ pub struct VSSCRIPTAPI {
         size: c_int,
         dst: *mut c_int,
     ) -> c_int,
+
+    /// Like [`getOutputNode()`](Self::getOutputNode), with a bitmask of
+    /// [`VSScriptGetFlags`]. With no flags, GPU outputs are automatically downloaded.
+    /// With `AllowGPUResident`, the script's original residency is preserved.
+    /// The returned reference must be freed before the script is destroyed.
+    /// Returns `NULL` for an unset output. Added in API 4.4.
+    #[cfg(feature = "vsscript-44")]
+    pub getOutputNodeEx: unsafe extern "system-unwind" fn(
+        handle: *mut VSScript,
+        index: c_int,
+        flags: c_int,
+    ) -> *mut VSNode,
+    /// Like [`getOutputAlphaNode()`](Self::getOutputAlphaNode), with
+    /// [`VSScriptGetFlags`] controlling GPU residency. The returned reference
+    /// must be freed before the script. Returns `NULL` if no alpha output exists.
+    /// Added in API 4.4.
+    #[cfg(feature = "vsscript-44")]
+    pub getOutputAlphaNodeEx: unsafe extern "system-unwind" fn(
+        handle: *mut VSScript,
+        index: c_int,
+        flags: c_int,
+    ) -> *mut VSNode,
+    /// Writes at most `size` output indices to `dst` and returns the total count.
+    /// Accepts a bitmask of [`VSScriptGetFlags`]. Added in API 4.4.
+    #[cfg(feature = "vsscript-44")]
+    pub getAvailableOutputNodesEx: unsafe extern "system-unwind" fn(
+        handle: *mut VSScript,
+        size: c_int,
+        dst: *mut c_int,
+        flags: c_int,
+    ) -> c_int,
+    /// Stores the named script variable in `dst` under its name. Returns 0 on success.
+    /// A bitmask of [`VSScriptGetFlags`] controls GPU residency: without
+    /// `AllowGPUResident`, nodes are downloaded and GPU frame variables fail.
+    /// Added in API 4.4.
+    #[cfg(feature = "vsscript-44")]
+    pub getVariableEx: unsafe extern "system-unwind" fn(
+        handle: *mut VSScript,
+        name: *const c_char,
+        dst: *mut VSMap,
+        flags: c_int,
+    ) -> c_int,
 }
 
 // Since R74 no `VapourSynth` distribution ships an import library, so Windows
@@ -246,4 +303,29 @@ unsafe extern "system-unwind" {
     /// or an empty string on success.
     #[cfg(feature = "vsscript-43")]
     pub fn getVSScriptAPILastError() -> *const c_char;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn api_layout() {
+        let pointers = 15
+            + usize::from(cfg!(feature = "vsscript-42"))
+            + 4 * usize::from(cfg!(feature = "vsscript-44"));
+        assert_eq!(
+            std::mem::size_of::<VSSCRIPTAPI>(),
+            pointers * std::mem::size_of::<*const ()>()
+        );
+        #[cfg(feature = "vsscript-44")]
+        {
+            assert_eq!(
+                std::mem::offset_of!(VSSCRIPTAPI, getOutputNodeEx),
+                16 * std::mem::size_of::<*const ()>()
+            );
+            assert_eq!(VSSCRIPT_API_MINOR, 4);
+            assert_eq!(VSScriptGetFlags::AllowGPUResident as c_int, 1);
+        }
+    }
 }

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- Add the ST428 transfer constant and helper plugin identifiers.
+- Bind the R80 Vulkan API behind `vulkan`, using Ash Vulkan types.
+- Add VSScript API 4.4 and GPU-aware output and variable accessors.
+
+- Require Rust 1.95 and use `cfg_select!` for conditional API selection.
+
+- Add `vs-43` for R80: GPU filter flags, residency types and all five new core API functions.
+- Move graph inspection after the API 4.3 entries; `vs-graph` now requires `vs-43`.
+
 ## [0.4.1+R79]
 
 Tracks `VapourSynth` R79, adding VapourSynth API 4.2 and VSScript API 4.3.

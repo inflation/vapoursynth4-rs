@@ -34,6 +34,13 @@ pub trait Node: Sized + Send + Sync + crate::_private::Sealed {
     #[must_use]
     fn get_frame_filter(&self, n: i32, ctx: &mut FrameContext) -> Self::FrameType;
 
+    /// Returns whether the data resides in host or GPU memory.
+    #[cfg(feature = "vs-43")]
+    #[must_use]
+    fn residency(&self) -> ffi::VSNodeResidency {
+        unsafe { (self.api().getNodeResidency)(self.as_ptr()) }
+    }
+
     fn set_linear_filter(&mut self) -> i32 {
         unsafe { (self.api().setLinearFilter)(self.as_ptr()) }
     }
@@ -197,21 +204,26 @@ impl VideoNode {
         let filter = Box::new(filter);
         let name = CString::new(name).ok()?;
         let core = core.as_ref();
+        let create = core::cfg_select! {
+            feature = "vs-43" => core.api().createVideoFilterEx2,
+            _ => core.api().createVideoFilter2,
+        };
         let ptr = unsafe {
-            (core.api().createVideoFilter2)(
+            create(
                 name.as_ptr(),
                 info,
                 F::filter_get_frame,
                 Some(F::filter_free),
                 F::FILTER_MODE,
+                #[cfg(feature = "vs-43")]
+                F::FLAGS,
                 dependencies.as_ptr(),
                 dependencies.len().try_into().unwrap(),
                 Box::into_raw(filter).cast(),
                 core.as_ptr(),
             )
         };
-        ptr.is_null()
-            .then_some(unsafe { Self::from_ptr(ptr, core.api()) })
+        (!ptr.is_null()).then(|| unsafe { Self::from_ptr(ptr, core.api()) })
     }
 }
 

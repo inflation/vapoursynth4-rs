@@ -18,6 +18,13 @@ pub trait Frame: Sized + Send + internal::FrameFromPtr {
     #[must_use]
     fn as_ptr(&self) -> *mut ffi::VSFrame;
 
+    /// Returns whether the data resides in host or GPU memory.
+    #[cfg(feature = "vs-43")]
+    #[must_use]
+    fn residency(&self) -> ffi::VSNodeResidency {
+        unsafe { (self.api().getFrameResidency)(self.as_ptr()) }
+    }
+
     #[must_use]
     #[inline]
     fn properties(&self) -> Option<MapRef<'_>> {

@@ -8,12 +8,19 @@
 
 #![allow(clippy::cast_possible_truncation)]
 
-use std::ffi::{c_int, c_void};
+use std::ffi::{CStr, c_int, c_void};
 
 use crate::{
     VSAPI, VSAudioFormat, VSAudioInfo, VSColorFamily, VSCore, VSPresetVideoFormat, VSVideoFormat,
     VSVideoInfo,
 };
+
+/// Identifier of the built-in standard filters plugin.
+pub const VSH_STD_PLUGIN_ID: &CStr = c"com.vapoursynth.std";
+/// Identifier of the built-in resize plugin.
+pub const VSH_RESIZE_PLUGIN_ID: &CStr = c"com.vapoursynth.resize";
+/// Identifier of the text plugin.
+pub const VSH_TEXT_PLUGIN_ID: &CStr = c"com.vapoursynth.text";
 
 /// Convenience function for checking if the format never changes between frames
 #[inline]

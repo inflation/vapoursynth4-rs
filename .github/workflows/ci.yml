@@ -35,12 +35,17 @@ jobs:
       - name: Install VapourSynth
         shell: bash
         run: scripts/install-vs.sh
+      - name: Install Vulkan headers and Lavapipe
+        shell: bash
+        run: bash scripts/install-vulkan.sh
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
       - name: Build
         run: cargo build --all-features --workspace
       - name: Tests
         run: cargo nextest run --all-features --workspace
+        env:
+          VAPOURSYNTH_REQUIRE_VULKAN: "1"
 
   coverage:
     name: Code Coverage
@@ -59,6 +64,8 @@ jobs:
           python-version: '3.13'
       - name: Install VapourSynth
         run: scripts/install-vs.sh
+      - name: Install Vulkan headers and Lavapipe
+        run: bash scripts/install-vulkan.sh
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Install cargo-nextest
@@ -70,6 +77,8 @@ jobs:
           --all-features --workspace
           --ignore-filename-regex vapoursynth4-sys/
           --lcov --output-path lcov.info
+        env:
+          VAPOURSYNTH_REQUIRE_VULKAN: "1"
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
@@ -89,6 +98,8 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
+      - name: Install Vulkan headers and Lavapipe
+        run: bash scripts/install-vulkan.sh
       # Cached separately from the Rust cache: this tree depends only on the
       # build script, not on Cargo.toml or the toolchain, and keying it off those
       # threw the whole C++ build away on every version bump. No restore-keys --
@@ -98,7 +109,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: vapoursynth/
-          key: vapoursynth-${{ runner.os }}-${{ hashFiles('scripts/build-vs.sh') }}
+          key: vapoursynth-${{ runner.os }}-vulkan-${{ hashFiles('scripts/build-vs.sh') }}
       - name: Cache
         uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v7
@@ -119,6 +130,8 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=address"
           RUSTDOCFLAGS: "-Z sanitizer=address"
+          LSAN_OPTIONS: "suppressions=${{ github.workspace }}/.github/lsan.supp"
+          VAPOURSYNTH_REQUIRE_VULKAN: "1"
 
   clippy:
     name: Clippy

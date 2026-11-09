@@ -12,11 +12,15 @@ mod constants;
 pub mod helper;
 mod vs;
 mod vsscript;
+#[cfg(feature = "vulkan")]
+pub mod vulkan;
 
 pub use crate::constants::*;
 pub use crate::vs::*;
 #[cfg(feature = "vsscript")]
 pub use crate::vsscript::*;
+#[cfg(feature = "vulkan")]
+pub use crate::vulkan::*;
 
 macro_rules! opaque_struct {
     ($($(#[$outer:meta])*$name:ident),+) => {
