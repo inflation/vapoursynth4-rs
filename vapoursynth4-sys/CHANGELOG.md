@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [0.5.0+R79](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.4.1+R79...vapoursynth4-sys-v0.5.0+R79)
+## [0.5.0+R80](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.4.1+R79...vapoursynth4-sys-v0.5.0+R80)
 
 ### ⛰️ Features
 
