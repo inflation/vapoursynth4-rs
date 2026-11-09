@@ -345,7 +345,7 @@ mod tests {
             eprintln!("Skipping GPU residency test: {error}");
             return Ok(());
         }
-        script.evaluate(c"import vapoursynth as vs\nclip = vs.core.std.BlankClip(width=16, height=16, length=1, format=vs.GRAY8)\ngpu = vs.core.std.GPUUpload(clip)\ngpu.set_output(0)\ngpu_frame = gpu.get_frame(0)\n", c"api44_gpu.vpy")?;
+        script.evaluate(c"import vapoursynth as vs\nclip = vs.core.std.BlankClip(width=16, height=16, length=1, format=vs.GRAY8, color=[42])\ngpu = vs.core.std.GPUUpload(clip)\ngpu.set_output(0, alpha=gpu)\ngpu_frame = gpu.get_frame(0)\n", c"api44_gpu.vpy")?;
         let allow_gpu = ffi::VSScriptGetFlags::AllowGPUResident as c_int;
         for (flags, residency) in [
             (0, ffi::VSNodeResidency::CPU),
@@ -354,9 +354,19 @@ mod tests {
             let output = script.get_output_ex(0, flags)?;
             let node = output.as_video().unwrap();
             assert_eq!(node.residency(), residency);
+            assert_eq!(script.get_output_alpha_ex(0, flags)?.residency(), residency);
+            let frame = node
+                .get_frame(0)
+                .map_err(|error| error.to_string_lossy().into_owned())?;
+            assert_eq!(frame.residency(), residency);
+            if residency == ffi::VSNodeResidency::CPU {
+                assert_eq!(unsafe { frame.plane(0).read() }, 42);
+            }
+            let mut variables = script.core()?.create_map();
+            script.get_variable_ex(c"gpu", &mut variables, flags)?;
             assert_eq!(
-                node.get_frame(0)
-                    .map_err(|error| error.to_string_lossy().into_owned())?
+                variables
+                    .get_video_node(KeyStr::from_cstr(c"gpu"), 0)?
                     .residency(),
                 residency
             );

@@ -64,6 +64,8 @@ jobs:
           python-version: '3.13'
       - name: Install VapourSynth
         run: scripts/install-vs.sh
+      - name: Install Vulkan headers and Lavapipe
+        run: bash scripts/install-vulkan.sh
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Install cargo-nextest
@@ -75,6 +77,8 @@ jobs:
           --all-features --workspace
           --ignore-filename-regex vapoursynth4-sys/
           --lcov --output-path lcov.info
+        env:
+          VAPOURSYNTH_REQUIRE_VULKAN: "1"
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
