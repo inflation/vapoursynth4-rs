@@ -11,7 +11,7 @@ use crate::{
     node::FilterMode,
 };
 
-/// A filter instance that VapourSynth can move between worker threads and call concurrently.
+/// A filter instance that `VapourSynth` can move between worker threads and call concurrently.
 pub trait Filter: Sized + Send + Sync + std::panic::RefUnwindSafe + 'static {
     /// Bitmask of [`ffi::VSFilterFlags`] used when creating video nodes.
     /// GPU output must agree with [`Self::RETURN_TYPE`]; defaults to CPU output.
@@ -63,13 +63,14 @@ pub struct FilterRegister<F: Filter> {
 }
 
 impl<F: Filter> FilterRegister<F> {
+    #[must_use]
     pub fn new(data: Option<&'static F::FilterData>) -> Self {
         Self { data }
     }
 
     /// # Safety
     ///
-    /// Both pointers must be valid for a VapourSynth plugin registration call.
+    /// Both pointers must be valid for a `VapourSynth` plugin registration call.
     pub unsafe fn register(self, plugin: *mut ffi::VSPlugin, vspapi: *const ffi::VSPLUGINAPI) {
         use super::internal::FilterExtern;
 

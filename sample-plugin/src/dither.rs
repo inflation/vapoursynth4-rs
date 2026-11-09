@@ -119,3 +119,64 @@ impl Filter for DitherFilter {
     const ARGS: &'static CStr = c"clip:vnode;bits:int:opt;";
     const RETURN_TYPE: &'static CStr = c"clip:vnode;";
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vapoursynth4_rs::{core::Core, sciprt::Script};
+
+    #[test]
+    fn reports_missing_input_and_missing_fmtconv() -> testresult::TestResult {
+        let script = Script::new(
+            Some(Core::builder().disable_auto_loading().build()),
+            Default::default(),
+        );
+        let core = script.core()?;
+        let mut output = core.create_map();
+        let args = core.create_map();
+        assert_eq!(
+            DitherFilter::create(args.as_ref(), output.as_mut(), None, script.core()?),
+            Err(c"Failed to get clip")
+        );
+
+        let std = core.get_plugin_by_namespace(c"std").unwrap();
+        let clip = std.invoke(c"BlankClip", args);
+        assert_eq!(
+            DitherFilter::create(clip.as_ref(), output.as_mut(), None, script.core()?),
+            Err(c"Failed to find the fmtconv plugin.")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn copies_frames_from_the_dithered_clip() -> testresult::TestResult {
+        let script = Script::default();
+        let core = script.core()?;
+        let std = core.get_plugin_by_namespace(c"std").unwrap();
+        let clip = std.invoke(c"BlankClip", core.create_map());
+        let source = clip.get_video_node(key!(c"clip"), 0)?;
+        let info = source.info().clone();
+        let deps = [FilterDependency {
+            source: source.as_ptr(),
+            request_pattern: RequestPattern::StrictSpatial,
+        }];
+        let mut output = core.create_map();
+        core.create_video_filter(
+            &mut output.as_mut(),
+            c"Depth",
+            &info,
+            Box::new(DitherFilter { node: source }),
+            Dependencies::new(&deps).unwrap(),
+        );
+        let filtered = output.get_video_node(key!(c"clip"), 0)?;
+        let frame = filtered
+            .get_frame(0)
+            .map_err(|error| error.to_string_lossy().into_owned())?;
+        assert_eq!(frame.frame_width(0), info.width);
+        assert_eq!(
+            frame.get_video_format().bits_per_sample,
+            info.format.bits_per_sample
+        );
+        Ok(())
+    }
+}

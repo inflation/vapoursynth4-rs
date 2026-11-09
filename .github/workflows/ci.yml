@@ -70,13 +70,14 @@ jobs:
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
-      - name: Build
-        run: cargo +nightly build --all-features --workspace
       - name: Generate code coverage
-        run: cargo +nightly llvm-cov nextest
-          --all-features --workspace
-          --ignore-filename-regex vapoursynth4-sys/
-          --lcov --output-path lcov.info
+        run: |
+          cargo +nightly llvm-cov clean --profraw-only
+          coverage_env=$(cargo +nightly llvm-cov show-env --sh)
+          eval "$coverage_env"
+          cargo +nightly build --all-features --workspace
+          cargo +nightly nextest run --all-features --workspace
+          cargo +nightly llvm-cov report --ignore-filename-regex vapoursynth4-sys/ --lcov --output-path lcov.info
         env:
           VAPOURSYNTH_REQUIRE_VULKAN: "1"
       - name: Upload coverage to Codecov

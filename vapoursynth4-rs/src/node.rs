@@ -13,7 +13,7 @@ use std::ffi::{CStr, CString, c_void};
 use crate::{
     AudioInfo, VideoInfo,
     api::Api,
-    core::Core,
+    core::CoreHandle,
     ffi,
     frame::{AudioFrame, Frame, FrameContext, VideoFrame, internal::FrameFromPtr},
     node::internal::FilterExtern,
@@ -61,12 +61,11 @@ pub trait Node: Sized + Send + Sync + crate::_private::Sealed {
     ///
     /// Return the internal error message if the frame is not ready.
     fn get_frame(&self, n: i32) -> Result<Self::FrameType, CString> {
-        let mut buf = vec![0; 1024];
+        let mut buf = [0; 1024];
         let ptr = unsafe { (self.api().getFrame)(n, self.as_ptr(), buf.as_mut_ptr(), 1024) };
 
         if ptr.is_null() {
-            let mut buf = std::mem::ManuallyDrop::new(buf);
-            Err(unsafe { CStr::from_ptr(buf.as_mut_ptr()).into() })
+            Err(unsafe { CStr::from_ptr(buf.as_ptr()).into() })
         } else {
             unsafe { Ok(Self::FrameType::from_ptr(ptr, self.api())) }
         }
@@ -199,11 +198,10 @@ impl VideoNode {
         info: &VideoInfo,
         filter: F,
         dependencies: &[ffi::VSFilterDependency],
-        core: impl AsRef<Core>,
+        core: &CoreHandle,
     ) -> Option<Self> {
         let filter = Box::new(filter);
         let name = CString::new(name).ok()?;
-        let core = core.as_ref();
         let create = core::cfg_select! {
             feature = "vs-43" => core.api().createVideoFilterEx2,
             _ => core.api().createVideoFilter2,
@@ -295,11 +293,10 @@ impl AudioNode {
         info: &AudioInfo,
         filter: F,
         dependencies: &[ffi::VSFilterDependency],
-        core: impl AsRef<Core>,
+        core: &CoreHandle,
     ) -> Option<Self> {
         let filter = Box::new(filter);
         let name = CString::new(name).ok()?;
-        let core = core.as_ref();
         let ptr = unsafe {
             (core.api().createAudioFilter2)(
                 name.as_ptr(),
@@ -332,3 +329,56 @@ impl Drop for AudioNode {
 
 pub type FilterMode = ffi::VSFilterMode;
 pub type CacheMode = ffi::VSCacheMode;
+
+#[cfg(all(test, feature = "link-vs"))]
+mod tests {
+    use std::{ffi::c_char, sync::mpsc, time::Duration};
+
+    use super::*;
+    use crate::core::Core;
+
+    type FrameResult = Result<VideoFrame, CString>;
+
+    unsafe extern "system-unwind" fn complete(
+        data: *mut c_void,
+        frame: *const ffi::VSFrame,
+        _: i32,
+        _: *mut ffi::VSNode,
+        error: *const c_char,
+    ) {
+        unsafe {
+            let sender = Box::from_raw(data.cast::<mpsc::Sender<FrameResult>>());
+            let result = if frame.is_null() {
+                Err(CStr::from_ptr(error).into())
+            } else {
+                Ok(VideoFrame::from_ptr(frame, Api::default()))
+            };
+            let _ = sender.send(result);
+        }
+    }
+
+    #[test]
+    fn async_frame_requests_deliver_success_and_failure() -> testresult::TestResult {
+        let core = Core::builder().disable_auto_loading().build();
+        let plugin = core.get_plugin_by_namespace(c"std").unwrap();
+        let output = plugin.invoke(c"BlankClip", core.create_map());
+        let mut node = output.get_video_node(crate::key!(c"clip"), 0)?;
+        node.set_cache_mode(CacheMode::ForceEnable);
+        node.set_cache_options(0, 4, 2);
+        node.set_linear_filter();
+
+        for n in [0, node.info().num_frames] {
+            let (sender, receiver) = mpsc::channel::<FrameResult>();
+            unsafe {
+                node.get_frame_async(n, Box::into_raw(Box::new(sender)).cast(), complete);
+            }
+            let result = receiver.recv_timeout(Duration::from_secs(10))?;
+            if n == 0 {
+                assert_eq!(result.unwrap().frame_width(0), node.info().width);
+            } else {
+                assert_ne!(result.unwrap_err().as_bytes(), b"");
+            }
+        }
+        Ok(())
+    }
+}

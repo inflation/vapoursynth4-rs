@@ -141,3 +141,24 @@ pub mod error {
         pub minor: u16,
     }
 }
+
+#[cfg(all(test, feature = "link-vs"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_unsupported_core_api_versions() {
+        let error = Api::new(99, 0).unwrap_err();
+        assert_eq!(
+            error,
+            ApiNotFound {
+                major: 99,
+                minor: 0
+            }
+        );
+        assert_eq!(
+            Api::new(ffi::VAPOURSYNTH_API_MAJOR, ffi::VAPOURSYNTH_API_MINOR).unwrap(),
+            Api::default()
+        );
+    }
+}

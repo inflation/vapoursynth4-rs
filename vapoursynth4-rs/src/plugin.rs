@@ -154,3 +154,60 @@ macro_rules! declare_plugin {
         }
     };
 }
+
+#[cfg(all(test, feature = "link-vs"))]
+mod tests {
+    use crate::{
+        core::Core,
+        key,
+        map::{AppendMode, Value},
+    };
+
+    #[test]
+    fn discovers_and_invokes_builtin_plugin() -> testresult::TestResult {
+        let core = Core::builder()
+            .disable_auto_loading()
+            .enable_graph_inspection()
+            .build();
+        let plugin = core.get_plugin_by_namespace(c"std").unwrap();
+        assert_eq!(plugin.namespace(), c"std");
+        assert_eq!(plugin.id(), c"com.vapoursynth.std");
+        assert!(!plugin.name().is_empty());
+        assert!(plugin.version() > 0);
+        assert_eq!(core.get_plugin_by_id(plugin.id()), Some(plugin));
+        assert!(core.get_plugin_by_namespace(c"missing").is_none());
+        assert!(core.get_plugin_by_id(c"missing").is_none());
+
+        let plugin = core
+            .plugins()
+            .find(|plugin| plugin.namespace() == c"std")
+            .unwrap();
+        let blank = plugin.get_function_by_name(c"BlankClip").unwrap();
+        assert_eq!(blank.name(), c"BlankClip");
+        assert!(blank.arguments().to_bytes().starts_with(b"clip:vnode"));
+        assert!(blank.return_type().to_bytes().starts_with(b"clip:vnode"));
+        assert!(plugin.functions().any(|function| function == blank));
+        assert!(plugin.get_function_by_name(c"Missing").is_none());
+
+        let mut args = core.create_map();
+        args.set(key!(c"width"), Value::Int(16), AppendMode::Replace)?;
+        args.set(key!(c"height"), Value::Int(16), AppendMode::Replace)?;
+        let output = plugin.invoke(blank.name(), &args);
+        assert!(output.get_error().is_none());
+        let clip = output.get_video_node(key!(c"clip"), 0)?;
+        assert_eq!(clip.info().width, 16);
+        #[cfg(feature = "vs-graph")]
+        {
+            use crate::node::Node;
+            assert_eq!(clip.creation_function_name(0), Some(c"BlankClip"));
+            assert_eq!(clip.creation_plugin_id(0), Some(c"com.vapoursynth.std"));
+            assert_eq!(clip.creation_plugin_namespace(0), Some(c"std"));
+            let arguments = clip.creation_function_arguments(0).unwrap();
+            assert_eq!(arguments.get_int(key!(c"width"), 0)?, 16);
+            assert!(clip.creation_function_name(20).is_none());
+            assert!(clip.creation_function_arguments(20).is_none());
+        }
+        assert!(plugin.invoke(c"Missing", &args).get_error().is_some());
+        Ok(())
+    }
+}

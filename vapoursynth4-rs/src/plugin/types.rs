@@ -60,3 +60,33 @@ impl Default for TypeBuilder {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::key;
+
+    #[test]
+    fn builds_plugin_argument_types() {
+        let mut builder = TypeBuilder::default();
+        for (key, ty, name) in [
+            (key!(c"a"), Type::Int, "int"),
+            (key!(c"b"), Type::Float, "float"),
+            (key!(c"c"), Type::Data, "data"),
+            (key!(c"d"), Type::ANode, "anode"),
+            (key!(c"e"), Type::VNode, "vnode"),
+            (key!(c"f"), Type::AFrame, "aframe"),
+            (key!(c"g"), Type::VFrame, "vframe"),
+            (key!(c"h"), Type::Func, "func"),
+        ] {
+            assert_eq!(ty.to_args(), name);
+            builder.add(key, ty, false);
+        }
+        let values = Key::from(key!(c"values"));
+        builder.add(&values, Type::Array(Box::new(Type::Int)), true);
+        let args = builder.build();
+        assert_eq!(args.len(), 9);
+        assert_eq!(args[&values].0.to_args(), "int[]");
+        assert!(args[&values].1);
+    }
+}

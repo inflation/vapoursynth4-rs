@@ -121,3 +121,17 @@ macro_rules! key {
 #[derive(Debug, Error)]
 #[error("Key is invalid. Only ascii alphanumeric or underscore is allowed.")]
 pub struct InvalidKey;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_and_formats_owned_and_borrowed_keys() {
+        let key = Key::new(&b"Frame_1\0ignored"[..]).unwrap();
+        assert_eq!(key.to_string(), "Frame_1");
+        assert_eq!((*key).to_string(), "Frame_1");
+        assert_eq!(Key::from(KeyStr::from_cstr(c"Frame_1")), key);
+        assert!(Key::new("frame-name").is_err());
+    }
+}

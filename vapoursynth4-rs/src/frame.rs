@@ -258,6 +258,60 @@ mod tests {
     };
 
     #[test]
+    fn assembling_frames_retains_source_samples() {
+        let core = crate::core::Core::builder().disable_auto_loading().build();
+        let gray = core
+            .query_video_format(
+                crate::ffi::VSColorFamily::Gray,
+                crate::ffi::VSSampleType::Integer,
+                8,
+                0,
+                0,
+            )
+            .unwrap();
+        let mut source = core.new_video_frame(&gray, 16, 16, None);
+        unsafe { source.plane_mut(0).write(42) };
+        let source = source.freeze();
+        let video = unsafe {
+            core.new_video_frame2(&gray, 16, 16, &[source.as_ptr()], &[0], Some(&source))
+        };
+        drop(source);
+        let video = video.freeze();
+        assert_eq!(video.get_video_format().bits_per_sample, 8);
+        assert!(video.stride(0) >= 16);
+        assert_eq!(unsafe { video.plane(0).read() }, 42);
+
+        let stereo = core
+            .query_audio_format(crate::ffi::VSSampleType::Integer, 16, 3)
+            .unwrap();
+        let mut source = core.new_audio_frame(&stereo, 32, None);
+        unsafe {
+            source
+                .channel_mut(0)
+                .copy_from_nonoverlapping(17_i16.to_ne_bytes().as_ptr(), 2);
+            source
+                .channel_mut(1)
+                .copy_from_nonoverlapping(29_i16.to_ne_bytes().as_ptr(), 2);
+        }
+        let source = source.freeze();
+        let audio = unsafe {
+            core.new_audio_frame2(
+                &stereo,
+                32,
+                &[source.as_ptr(), source.as_ptr()],
+                &[1, 0],
+                Some(&source),
+            )
+        };
+        drop(source);
+        let audio = audio.freeze();
+        assert_eq!(audio.get_audio_format().num_channels, 2);
+        assert_eq!(audio.frame_length(), 32);
+        assert_eq!(unsafe { audio.channel(0).read() }, 29_i16.to_ne_bytes()[0]);
+        assert_eq!(unsafe { audio.channel(1).read() }, 17_i16.to_ne_bytes()[0]);
+    }
+
+    #[test]
     fn freezing_preserves_handle_and_copying_isolates_properties() {
         let core = Core::builder().build();
         let format = core

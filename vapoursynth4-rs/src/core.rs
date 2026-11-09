@@ -29,7 +29,7 @@ use crate::{
     plugin::{Plugin, Plugins},
 };
 
-/// A borrowed core supplied by VapourSynth.
+/// A borrowed core supplied by `VapourSynth`.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CoreRef<'c> {
     handle: CoreHandle,
@@ -184,7 +184,7 @@ impl CoreHandle {
         }
     }
 
-    /// Calls VapourSynth's video plane assembly without validation.
+    /// Calls `VapourSynth`'s video plane assembly without validation.
     ///
     /// # Safety
     ///
@@ -235,7 +235,7 @@ impl CoreHandle {
         }
     }
 
-    /// Calls VapourSynth's audio channel assembly without validation.
+    /// Calls `VapourSynth`'s audio channel assembly without validation.
     ///
     /// # Safety
     ///
@@ -275,7 +275,7 @@ impl CoreHandle {
         }
     }
 
-    /// Returns the format if VapourSynth accepts the requested parameters.
+    /// Returns the format if `VapourSynth` accepts the requested parameters.
     #[must_use]
     pub fn query_video_format(
         &self,
@@ -306,11 +306,11 @@ impl CoreHandle {
         if 0 == unsafe { (self.api.getVideoFormatName)(format, buffer.as_mut_ptr().cast()) } {
             None
         } else {
-            Some(buffer.to_string())
+            buffer.as_str().map(str::to_owned)
         }
     }
 
-    /// Returns the format if VapourSynth accepts the requested parameters.
+    /// Returns the format if `VapourSynth` accepts the requested parameters.
     #[must_use]
     pub fn query_audio_format(
         &self,
@@ -337,7 +337,7 @@ impl CoreHandle {
         if 0 == unsafe { (self.api.getAudioFormatName)(format, buffer.as_mut_ptr().cast()) } {
             None
         } else {
-            Some(buffer.to_string())
+            buffer.as_str().map(str::to_owned)
         }
     }
 
@@ -362,7 +362,7 @@ impl CoreHandle {
         }
     }
 
-    /// Returns the format if VapourSynth recognizes the ID.
+    /// Returns the format if `VapourSynth` recognizes the ID.
     #[must_use]
     pub fn get_video_format_by_id(&self, id: u32) -> Option<VideoFormat> {
         unsafe {
@@ -509,7 +509,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn format_queries_return_none_on_failure() {
+    fn format_queries_check_native_results() {
         let core = Core::builder().disable_auto_loading().build();
         assert!(
             core.query_video_format(ColorFamily::Gray, SampleType::Integer, 0, 0, 0)
@@ -520,6 +520,21 @@ mod tests {
                 .is_none()
         );
         assert!(core.get_video_format_by_id(u32::MAX).is_none());
+
+        let video = core
+            .query_video_format(ColorFamily::Gray, SampleType::Integer, 8, 0, 0)
+            .unwrap();
+        let id = core.query_video_format_id(ColorFamily::Gray, SampleType::Integer, 8, 0, 0);
+        let preset = core.get_video_format_by_id(id).unwrap();
+        assert_eq!(video.bits_per_sample, 8);
+        assert_eq!(core.get_video_format_name(&video).as_deref(), Some("Gray8"));
+        assert_eq!(preset.bits_per_sample, video.bits_per_sample);
+        assert_eq!(preset.color_family, video.color_family);
+
+        let audio = core.query_audio_format(SampleType::Integer, 16, 3).unwrap();
+        assert_eq!(audio.bits_per_sample, 16);
+        assert_eq!(audio.num_channels, 2);
+        assert_ne!(core.get_audio_format_name(&audio).unwrap(), "");
     }
 
     #[test]

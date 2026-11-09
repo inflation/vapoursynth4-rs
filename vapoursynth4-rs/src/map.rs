@@ -219,10 +219,8 @@ macro_rules! map_read_methods {
                     let size = self.get_internal(self.api.mapGetDataSize, key, index)?;
                     let ptr = self.get_internal(self.api.mapGetData, key, index)?;
 
-                    Ok(std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-                        ptr.cast(),
-                        size as _,
-                    )))
+                    std::str::from_utf8(std::slice::from_raw_parts(ptr.cast(), size as _))
+                        .map_err(|_| MapPropertyError::InvalidType)
                 } else {
                     Err(MapPropertyError::InvalidType)
                 }
@@ -248,6 +246,11 @@ macro_rules! map_read_methods {
             index: i32,
         ) -> Result<VideoNode, MapPropertyError> {
             unsafe {
+                if (self.api.mapGetType)(self.as_ptr(), key.as_ptr())
+                    == ffi::VSPropertyType::AudioNode
+                {
+                    return Err(MapPropertyError::InvalidType);
+                }
                 self.get_internal(self.api.mapGetNode, key, index)
                     .map(|p| VideoNode::from_ptr(p, self.api))
             }
@@ -262,6 +265,11 @@ macro_rules! map_read_methods {
             index: i32,
         ) -> Result<AudioNode, MapPropertyError> {
             unsafe {
+                if (self.api.mapGetType)(self.as_ptr(), key.as_ptr())
+                    == ffi::VSPropertyType::VideoNode
+                {
+                    return Err(MapPropertyError::InvalidType);
+                }
                 self.get_internal(self.api.mapGetNode, key, index)
                     .map(|p| AudioNode::from_ptr(p, self.api))
             }
@@ -276,6 +284,11 @@ macro_rules! map_read_methods {
             index: i32,
         ) -> Result<VideoFrame, MapPropertyError> {
             unsafe {
+                if (self.api.mapGetType)(self.as_ptr(), key.as_ptr())
+                    == ffi::VSPropertyType::AudioFrame
+                {
+                    return Err(MapPropertyError::InvalidType);
+                }
                 self.get_internal(self.api.mapGetFrame, key, index)
                     .map(|p| VideoFrame::from_ptr(p, self.api))
             }
@@ -290,6 +303,11 @@ macro_rules! map_read_methods {
             index: i32,
         ) -> Result<AudioFrame, MapPropertyError> {
             unsafe {
+                if (self.api.mapGetType)(self.as_ptr(), key.as_ptr())
+                    == ffi::VSPropertyType::VideoFrame
+                {
+                    return Err(MapPropertyError::InvalidType);
+                }
                 self.get_internal(self.api.mapGetFrame, key, index)
                     .map(|p| AudioFrame::from_ptr(p, self.api))
             }
@@ -309,22 +327,11 @@ macro_rules! map_read_methods {
                     t::Data => {
                         use ffi::VSDataTypeHint as dt;
 
-                        let size = self.get_internal(self.api.mapGetDataSize, key, index)?;
-                        #[allow(clippy::cast_sign_loss)]
                         match self.get_internal(self.api.mapGetDataTypeHint, key, index)? {
                             dt::Unknown | dt::Binary => {
-                                let ptr = self.get_internal(self.api.mapGetData, key, index)?;
-                                Ok(Value::Data(std::slice::from_raw_parts(
-                                    ptr.cast(),
-                                    size as _,
-                                )))
+                                self.get_binary(key, index).map(Value::Data)
                             }
-                            dt::Utf8 => {
-                                let ptr = self.get_internal(self.api.mapGetData, key, index)?;
-                                Ok(Value::Utf8(std::str::from_utf8_unchecked(
-                                    std::slice::from_raw_parts(ptr.cast(), size as _),
-                                )))
-                            }
+                            dt::Utf8 => self.get_utf8(key, index).map(Value::Utf8),
                         }
                     }
                     t::Function => self.get_function(key, index).map(Value::Function),
@@ -420,7 +427,7 @@ macro_rules! map_write_methods {
         pub fn set_empty(&mut self, key: &KeyStr, type_: ffi::VSPropertyType) {
             // safety: `self.handle` is a valid pointer
             let res = unsafe { (self.api.mapSetEmpty)(self.as_ptr(), key.as_ptr(), type_) };
-            assert!(res != 0);
+            assert_eq!(res, 0);
         }
 
         unsafe fn set_internal<T>(
@@ -715,6 +722,93 @@ mod tests {
     use super::*;
 
     #[test]
+    fn typed_empty_arrays_and_property_errors() {
+        let mut map = Map::default();
+        let key = crate::key!(c"items");
+        assert_eq!(map.get_int(key, 0), Err(MapPropertyError::KeyNotFound));
+        map.as_mut().set_empty(key, ffi::VSPropertyType::Int);
+        assert_eq!(map.num_elements(key), Some(0));
+        assert_eq!(
+            map.get_int_array(key),
+            Err(MapPropertyError::IndexOutOfBound)
+        );
+        assert_eq!(map.get_int(key, 0), Err(MapPropertyError::IndexOutOfBound));
+        map.set_int_array(key, &[42]).unwrap();
+        assert_eq!(map.get_float(key, 0), Err(MapPropertyError::InvalidType));
+    }
+
+    #[test]
+    fn utf8_hint_does_not_guarantee_valid_utf8() {
+        let map = Map::default();
+        let key = crate::key!(c"data");
+        let bytes = [0xff_u8];
+        let status = unsafe {
+            (map.api.mapSetData)(
+                map.as_ptr(),
+                key.as_ptr(),
+                bytes.as_ptr().cast(),
+                1,
+                ffi::VSDataTypeHint::Utf8,
+                AppendMode::Replace,
+            )
+        };
+        assert_eq!(status, 0);
+        assert_eq!(map.get_utf8(key, 0), Err(MapPropertyError::InvalidType));
+        assert!(matches!(
+            map.get(key, 0),
+            Err(MapPropertyError::InvalidType)
+        ));
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn scalar_views_return_values_and_validate_data_hints() -> TestResult {
+        let mut map = Map::default();
+        let mut writable = map.as_mut();
+        assert!(writable.is_empty());
+        let int = crate::key!(c"i");
+        let float = crate::key!(c"f");
+        let bytes = crate::key!(c"b");
+        let text = crate::key!(c"s");
+        writable.set_int_array(int, &[1, 2])?;
+        writable.set_float_array(float, &[1.25, 2.5])?;
+        writable.set(bytes, Value::Data(b"bytes"), AppendMode::Replace)?;
+        writable.set(text, Value::Utf8("a\0b"), AppendMode::Replace)?;
+
+        macro_rules! check {
+            ($view:expr) => {{
+                let view = $view;
+                assert_eq!(view.len(), 4);
+                assert_eq!(view.get_key(0), bytes);
+                assert_eq!(view.num_elements(int), Some(2));
+                assert_eq!(view.get_int_array(int)?, &[1, 2]);
+                assert_eq!(view.get_int_saturated(int, 1)?, 2);
+                assert!(matches!(view.get(int, 0)?, Value::Int(1)));
+                assert_eq!(view.get_float_array(float)?, &[1.25, 2.5]);
+                assert_eq!(view.get_float_saturated(float, 1)?, 2.5);
+                assert!(matches!(view.get(float, 0)?, Value::Float(1.25)));
+                assert_eq!(view.get_binary(bytes, 0)?, b"bytes");
+                assert!(matches!(view.get(bytes, 0)?, Value::Data(b"bytes")));
+                assert_eq!(view.get_utf8(text, 0)?, "a\0b");
+                assert!(matches!(view.get(text, 0)?, Value::Utf8("a\0b")));
+                assert_eq!(view.get_binary(text, 0), Err(MapPropertyError::InvalidType));
+                assert_eq!(view.get_utf8(bytes, 0), Err(MapPropertyError::InvalidType));
+            }};
+        }
+
+        check!(&writable);
+        check!(writable.as_ref());
+        assert_eq!(writable.get_error(), None);
+        writable.delete_key(int);
+        assert_eq!(writable.num_elements(int), None);
+        writable.set_error(c"failed");
+        assert_eq!(writable.as_ref().get_error(), Some(c"failed"));
+        writable.clear();
+        assert!(writable.as_ref().is_empty());
+        Ok(())
+    }
+
+    #[test]
     fn borrowed_views() -> TestResult {
         let mut map = Map::default();
         let key = crate::key!(c"values");
@@ -726,8 +820,11 @@ mod tests {
         let view = map.as_ref();
         let copy = view;
         assert_eq!(copy.get_int_array(key)?, &[1, 2, 3]);
+        let owned = map.clone();
         map.as_mut().clear();
         assert!(map.is_empty());
+        drop(map);
+        assert_eq!(owned.get_int_array(key)?, &[1, 2, 3]);
         Ok(())
     }
 
@@ -815,57 +912,61 @@ mod tests {
     #[allow(clippy::float_cmp)]
     fn get_set() -> TestResult {
         let mut map = Map::default();
-        let key = crate::key!(c"what");
-
-        let source = i64::from(i32::MAX) + 1;
-        map.set(key, Value::Int(source), AppendMode::Replace)?;
-        let res = map.get(key, 0)?;
-        match res {
-            Value::Int(val) => assert_eq!(val, source, "Value of `{key}` is not correct"),
-            _ => panic!("Invalid type of `{key}`"),
+        macro_rules! check_values {
+            ($map:ident) => {{
+                let key = crate::key!(c"what");
+                let source = i64::from(i32::MAX) + 1;
+                $map.set(key, Value::Int(source), AppendMode::Replace)?;
+                let res = $map.get(key, 0)?;
+                match res {
+                    Value::Int(val) => assert_eq!(val, source, "Value of `{key}` is not correct"),
+                    _ => panic!("Invalid type of `{key}`"),
+                }
+                let res = $map.get_int_saturated(key, 0)?;
+                assert_eq!(res, i32::MAX, "Value of `{key}` is not correct");
+                $map.set(key, Value::Int(source), AppendMode::Append)?;
+                assert_eq!(&[source, source], $map.get_int_array(key)?);
+                $map.set_int_array(key, &[1, 2, 3])?;
+                assert_eq!(&[1, 2, 3], $map.get_int_array(key)?);
+                $map.set(key, Value::Float(1e25), AppendMode::Replace)?;
+                let res = $map.get(key, 0)?;
+                match res {
+                    Value::Float(val) => {
+                        assert_eq!(val, 1e25, "Value of `{key}` is not correct");
+                    }
+                    _ => panic!("Invalid type of `{key}`"),
+                }
+                let res = $map.get_float_saturated(key, 0)?;
+                assert_eq!(
+                    res, 9_999_999_562_023_526_247_432_192.0,
+                    "Value of `{key}` is not correct"
+                );
+                $map.set(key, Value::Float(f64::MAX), AppendMode::Append)?;
+                assert_eq!(&[1e25, f64::MAX], $map.get_float_array(key)?);
+                $map.set_float_array(key, &[1.0, 2.0, 3.0])?;
+                assert_eq!(&[1.0, 2.0, 3.0], $map.get_float_array(key)?);
+                $map.set(key, Value::Data(&[42, 43]), AppendMode::Replace)?;
+                let res = $map.get(key, 0)?;
+                match res {
+                    Value::Data(val) => {
+                        assert_eq!(val, &[42, 43], "Value of `{key}` is not correct");
+                    }
+                    _ => panic!("Invalid type of `{key}`"),
+                }
+                $map.set(key, Value::Utf8("good"), AppendMode::Replace)?;
+                let res = $map.get(key, 0)?;
+                match res {
+                    Value::Utf8(val) => {
+                        assert_eq!(val, "good", "Value of `{key}` is not correct");
+                    }
+                    _ => panic!("Invalid type of `{key}`"),
+                }
+            }};
         }
-        let res = map.get_int_saturated(key, 0)?;
-        assert_eq!(res, i32::MAX, "Value of `{key}` is not correct");
-        map.set(key, Value::Int(source), AppendMode::Append)?;
-        assert_eq!(&[source, source], map.get_int_array(key)?);
-        map.set_int_array(key, &[1, 2, 3])?;
-        assert_eq!(&[1, 2, 3], map.get_int_array(key)?);
 
-        map.set(key, Value::Float(1e25), AppendMode::Replace)?;
-        let res = map.get(key, 0)?;
-        match res {
-            Value::Float(val) => {
-                assert_eq!(val, 1e25, "Value of `{key}` is not correct");
-            }
-            _ => panic!("Invalid type of `{key}`"),
-        }
-        let res = map.get_float_saturated(key, 0)?;
-        assert_eq!(
-            res, 9_999_999_562_023_526_247_432_192.0,
-            "Value of `{key}` is not correct"
-        );
-        map.set(key, Value::Float(f64::MAX), AppendMode::Append)?;
-        assert_eq!(&[1e25, f64::MAX], map.get_float_array(key)?);
-        map.set_float_array(key, &[1.0, 2.0, 3.0])?;
-        assert_eq!(&[1.0, 2.0, 3.0], map.get_float_array(key)?);
-
-        map.set(key, Value::Data(&[42, 43]), AppendMode::Replace)?;
-        let res = map.get(key, 0)?;
-        match res {
-            Value::Data(val) => {
-                assert_eq!(val, &[42, 43], "Value of `{key}` is not correct");
-            }
-            _ => panic!("Invalid type of `{key}`"),
-        }
-
-        map.set(key, Value::Utf8("good"), AppendMode::Replace)?;
-        let res = map.get(key, 0)?;
-        match res {
-            Value::Utf8(val) => {
-                assert_eq!(val, "good", "Value of `{key}` is not correct");
-            }
-            _ => panic!("Invalid type of `{key}`"),
-        }
+        check_values!(map);
+        let mut view = map.as_mut();
+        check_values!(view);
 
         Ok(())
     }

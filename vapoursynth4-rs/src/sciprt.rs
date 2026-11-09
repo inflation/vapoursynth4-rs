@@ -53,11 +53,12 @@ impl OutputNode {
 impl Script {
     /// Creates a new script instance.
     ///
-    /// A supplied core is transferred to VSScript. Pass `None` to use a default core.
+    /// A supplied core is transferred to `VSScript`. Pass `None` to use a default core.
     ///
     /// # Panics
     ///
-    /// Panics if the VapourSynth API version is unavailable or script creation fails.
+    /// Panics if the `VapourSynth` API version is unavailable or script creation fails.
+    #[must_use]
     pub fn new(core: Option<Core>, vssapi: VssApi) -> Self {
         unsafe {
             let api_ptr = (vssapi.getVSAPI)(VAPOURSYNTH_API_VERSION);
@@ -304,6 +305,98 @@ mod tests {
     use crate::node::Node;
 
     #[test]
+    fn map_media_transfers_check_type_and_keep_references() -> testresult::TestResult {
+        use crate::{
+            key,
+            map::{AppendMode, MapPropertyError, Value},
+        };
+
+        let script = Script::default();
+        script.evaluate(
+            c"import vapoursynth as vs\nvs.core.std.BlankAudio().set_output(0)\nvs.core.std.BlankClip(width=16, height=16).set_output(1)\n",
+            c"map-media.vpy",
+        )?;
+        let audio = script.get_output_ex(0, 0)?;
+        let video = script.get_output_ex(1, 0)?;
+        let audio = audio.as_audio().unwrap().clone();
+        let video = video.as_video().unwrap().clone();
+        let audio_frame = audio.get_frame(0).unwrap();
+        let video_frame = video.get_frame(0).unwrap();
+
+        let audio_key = key!(c"audio");
+        let video_key = key!(c"video");
+        let mut map = script.core()?.create_map();
+        let replace = AppendMode::Replace;
+        macro_rules! check_nodes {
+            ($map:expr) => {{
+                let view = $map;
+                assert!(matches!(view.get(audio_key, 0)?, Value::AudioNode(_)));
+                assert!(matches!(view.get(video_key, 0)?, Value::VideoNode(_)));
+                assert!(matches!(
+                    view.get_video_node(audio_key, 0),
+                    Err(MapPropertyError::InvalidType)
+                ));
+                assert!(matches!(
+                    view.get_audio_node(video_key, 0),
+                    Err(MapPropertyError::InvalidType)
+                ));
+            }};
+        }
+        macro_rules! check_frames {
+            ($map:expr) => {{
+                let view = $map;
+                assert!(matches!(view.get(audio_key, 0)?, Value::AudioFrame(_)));
+                assert!(matches!(view.get(video_key, 0)?, Value::VideoFrame(_)));
+                assert!(matches!(
+                    view.get_video_frame(audio_key, 0),
+                    Err(MapPropertyError::InvalidType)
+                ));
+                assert!(matches!(
+                    view.get_audio_frame(video_key, 0),
+                    Err(MapPropertyError::InvalidType)
+                ));
+            }};
+        }
+
+        map.set(audio_key, Value::AudioNode(audio.clone()), replace)?;
+        map.set(video_key, Value::VideoNode(video.clone()), replace)?;
+        check_nodes!(&map);
+        map.as_mut()
+            .set(audio_key, Value::AudioNode(audio.clone()), replace)?;
+        map.as_mut()
+            .set(video_key, Value::VideoNode(video.clone()), replace)?;
+        check_nodes!(map.as_ref());
+        map.consume_node(audio_key, audio.clone(), replace)?;
+        map.consume_node(video_key, video.clone(), replace)?;
+        map.as_mut().consume_node(audio_key, audio, replace)?;
+        map.as_mut().consume_node(video_key, video, replace)?;
+        check_nodes!(map.as_mut());
+
+        map.set(audio_key, Value::AudioFrame(audio_frame.clone()), replace)?;
+        map.set(video_key, Value::VideoFrame(video_frame.clone()), replace)?;
+        check_frames!(&map);
+        map.as_mut()
+            .set(audio_key, Value::AudioFrame(audio_frame.clone()), replace)?;
+        map.as_mut()
+            .set(video_key, Value::VideoFrame(video_frame.clone()), replace)?;
+        check_frames!(map.as_ref());
+        map.consume_frame(audio_key, audio_frame.clone(), replace)?;
+        map.consume_frame(video_key, video_frame.clone(), replace)?;
+        map.as_mut()
+            .consume_frame(audio_key, audio_frame, replace)?;
+        map.as_mut()
+            .consume_frame(video_key, video_frame, replace)?;
+        check_frames!(map.as_mut());
+
+        let audio = map.get_audio_frame(audio_key, 0)?;
+        let video = map.get_video_frame(video_key, 0)?;
+        drop(map);
+        assert!(audio.frame_length() > 0);
+        assert_eq!(video.frame_width(0), 16);
+        Ok(())
+    }
+
+    #[test]
     fn api_44_audio_output() -> testresult::TestResult {
         let script = Script::default();
         script.evaluate(
@@ -326,11 +419,11 @@ mod tests {
     }
 
     #[test]
-    fn video_filter_constructor_preserves_input_frame() -> testresult::TestResult {
+    fn video_filter_delivers_frames_and_reports_failures() -> testresult::TestResult {
         use crate::{
             frame::{FrameContext, VideoFrame},
-            map::MapRef,
-            node::{ActivationReason, Filter},
+            map::{MapMut, MapRef},
+            node::{ActivationReason, Dependencies, Filter},
         };
         use std::ffi::c_void;
 
@@ -344,12 +437,7 @@ mod tests {
             const ARGS: &'static CStr = c"";
             const RETURN_TYPE: &'static CStr = c"clip:vnode;";
 
-            fn create(
-                _: MapRef,
-                _: MapRef,
-                _: Option<Box<()>>,
-                _: CoreRef,
-            ) -> Result<(), Self::Error> {
+            fn create(_: MapRef, _: MapMut, _: Option<&()>, _: CoreRef) -> Result<(), Self::Error> {
                 Err(c"Construct this filter directly")
             }
 
@@ -364,7 +452,11 @@ mod tests {
                 match reason {
                     ActivationReason::Initial => ctx.request_frame_filter(n, &self.0),
                     ActivationReason::AllFramesReady => {
-                        return Ok(Some(self.0.get_frame_filter(n, &mut ctx)));
+                        return match n {
+                            0 => Ok(Some(self.0.get_frame_filter(n, &mut ctx))),
+                            1 => Err(c"frame error"),
+                            _ => panic!("frame panic"),
+                        };
                     }
                     ActivationReason::Error => {}
                 }
@@ -374,7 +466,7 @@ mod tests {
 
         let script = Script::default();
         script.evaluate(
-            c"import vapoursynth as vs\nvs.core.std.BlankClip(width=16, height=16, length=1).set_output(0)\n",
+            c"import vapoursynth as vs\nvs.core.std.BlankClip(width=16, height=16, length=3).set_output(0)\n",
             c"filter.vpy",
         )?;
         let OutputNode::Video(source) = script.get_output_ex(0, 0)? else {
@@ -385,17 +477,36 @@ mod tests {
             source: source.as_ptr(),
             request_pattern: ffi::VSRequestPattern::StrictSpatial,
         }];
+        let core = script.core()?;
+        let mut output = core.create_map();
+        core.create_video_filter(
+            &mut output.as_mut(),
+            c"Passthrough",
+            &info,
+            Box::new(Passthrough(source.clone())),
+            Dependencies::new(&dependencies).unwrap(),
+        );
+        let mapped = output.get_video_node(crate::key!(c"clip"), 0)?;
+        drop(output);
+        assert_eq!(mapped.get_frame(0).unwrap().frame_width(0), 16);
+
         let node = VideoNode::new(
             "Passthrough",
             &info,
             Passthrough(source),
             &dependencies,
-            script.core()?,
+            &core,
         )
         .ok_or("Could not create passthrough filter")?;
         let frame = node.get_frame(0).expect("Passthrough frame");
         assert_eq!(frame.frame_width(0), 16);
         assert_eq!(frame.frame_height(0), 16);
+        assert_eq!(node.get_frame(1).unwrap_err().as_c_str(), c"frame error");
+        #[cfg(panic = "unwind")]
+        assert_eq!(
+            node.get_frame(2).unwrap_err().as_c_str(),
+            c"Rust filter panicked: frame panic"
+        );
         Ok(())
     }
 

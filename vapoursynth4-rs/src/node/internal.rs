@@ -188,7 +188,7 @@ mod tests {
                     output.as_ptr(),
                     user_data,
                     core.as_ptr(),
-                    &*core.api(),
+                    &raw const *core.api(),
                 );
             }
             assert_eq!(output.get_error(), Some(DATA));
@@ -197,10 +197,14 @@ mod tests {
 
     #[test]
     fn panic_text_is_appended_to_the_common_message() {
-        let payloads: [Box<dyn Any + Send>; 3] = [
+        let payloads: [Box<dyn Any + Send>; 7] = [
             Box::new("detail"),
             Box::new(String::from("de\0tail")),
+            Box::new(String::from("detail").into_boxed_str()),
+            Box::new(Cow::Borrowed("detail")),
+            Box::new(c"detail"),
             Box::new(c"detail".to_owned()),
+            Box::new(c"detail".to_owned().into_boxed_c_str()),
         ];
         for payload in payloads {
             report_panic(payload, |message| {
@@ -217,7 +221,7 @@ mod tests {
 
         impl Drop for PanicsOnDrop {
             fn drop(&mut self) {
-                panic!("payload destructor panicked");
+                std::panic::panic_any(());
             }
         }
 

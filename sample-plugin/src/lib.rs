@@ -139,7 +139,7 @@ declare_plugin!(
 #[cfg(test)]
 mod tests {
     use testresult::TestResult;
-    use vapoursynth4_rs::sciprt::Script;
+    use vapoursynth4_rs::{node::Node, sciprt::Script};
 
     #[test]
     fn test_vsscript_works() -> TestResult {
@@ -147,7 +147,11 @@ mod tests {
         vss.evaluate_file(c"test.vpy")?;
         let node = vss.get_output(0)?;
         let vn = node.as_video().ok_or("Expected video node")?;
-        let _info = vn.info();
+        let frame = vn
+            .get_frame(0)
+            .map_err(|error| error.to_string_lossy().into_owned())?;
+        assert_eq!(unsafe { frame.plane(0).read() }, !42);
+        assert_eq!(frame.frame_width(0), 16);
 
         Ok(())
     }
