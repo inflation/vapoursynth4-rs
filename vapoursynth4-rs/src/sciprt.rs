@@ -282,8 +282,103 @@ impl ScriptError {
 mod tests {
     use super::*;
     use crate::map::KeyStr;
-    #[cfg(feature = "vs-43")]
     use crate::node::Node;
+
+    #[test]
+    fn api_44_audio_output() -> testresult::TestResult {
+        let script = Script::default();
+        script.evaluate(
+            c"import vapoursynth as vs\nvs.core.std.BlankAudio().set_output(3)\n",
+            c"audio.vpy",
+        )?;
+        assert_eq!(script.get_available_outputs_ex(0)?, [3]);
+        let output = script.get_output_ex(3, 0)?;
+        assert!(output.as_video().is_none());
+        assert!(
+            output
+                .as_audio()
+                .ok_or("Expected audio output")?
+                .info()
+                .num_samples
+                > 0
+        );
+        assert!(script.get_output_alpha_ex(3, 0).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn video_filter_constructor_preserves_input_frame() -> testresult::TestResult {
+        use crate::{
+            frame::{FrameContext, VideoFrame},
+            map::MapRef,
+            node::{ActivationReason, Filter},
+        };
+        use std::ffi::c_void;
+
+        struct Passthrough(VideoNode);
+
+        impl Filter for Passthrough {
+            type Error = &'static CStr;
+            type FrameType = VideoFrame;
+            type FilterData = ();
+            const NAME: &'static CStr = c"Passthrough";
+            const ARGS: &'static CStr = c"";
+            const RETURN_TYPE: &'static CStr = c"clip:vnode;";
+
+            fn create(
+                _: MapRef,
+                _: MapRef,
+                _: Option<Box<()>>,
+                _: CoreRef,
+            ) -> Result<(), Self::Error> {
+                Err(c"Construct this filter directly")
+            }
+
+            fn get_frame(
+                &self,
+                n: i32,
+                reason: ActivationReason,
+                _: *mut *mut c_void,
+                mut ctx: FrameContext,
+                _: CoreRef,
+            ) -> Result<Option<VideoFrame>, Self::Error> {
+                match reason {
+                    ActivationReason::Initial => ctx.request_frame_filter(n, &self.0),
+                    ActivationReason::AllFramesReady => {
+                        return Ok(Some(self.0.get_frame_filter(n, &mut ctx)));
+                    }
+                    ActivationReason::Error => {}
+                }
+                Ok(None)
+            }
+        }
+
+        let script = Script::default();
+        script.evaluate(
+            c"import vapoursynth as vs\nvs.core.std.BlankClip(width=16, height=16, length=1).set_output(0)\n",
+            c"filter.vpy",
+        )?;
+        let OutputNode::Video(source) = script.get_output_ex(0, 0)? else {
+            return Err("Expected video output".into());
+        };
+        let info = source.info().clone();
+        let dependencies = [ffi::VSFilterDependency {
+            source: source.as_ptr(),
+            request_pattern: ffi::VSRequestPattern::StrictSpatial,
+        }];
+        let node = VideoNode::new(
+            "Passthrough",
+            &info,
+            Passthrough(source),
+            &dependencies,
+            script.core()?,
+        )
+        .ok_or("Could not create passthrough filter")?;
+        let frame = node.get_frame(0).expect("Passthrough frame");
+        assert_eq!(frame.frame_width(0), 16);
+        assert_eq!(frame.frame_height(0), 16);
+        Ok(())
+    }
 
     #[test]
     fn api_44_accessors() -> testresult::TestResult {
