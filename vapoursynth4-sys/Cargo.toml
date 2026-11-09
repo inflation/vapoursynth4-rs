@@ -1,6 +1,6 @@
 [package]
 name = "vapoursynth4-sys"
-version = "0.4.1+R79"
+version = "0.5.0+R79"
 edition = "2024"
 rust-version = "1.95"
 description = "Rust bindings for VapourSynth and VSScript API version 4"

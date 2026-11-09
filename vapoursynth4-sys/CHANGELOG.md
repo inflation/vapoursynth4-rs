@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.5.0+R79](https://github.com/inflation/vapoursynth4-rs/compare/vapoursynth4-sys-v0.4.1+R79...vapoursynth4-sys-v0.5.0+R79)
+
+### ⛰️ Features
+
+- Add Vulkan and VSScript 4.4 APIs - ([e41ebc7](https://github.com/inflation/vapoursynth4-rs/commit/e41ebc7da800507d39875732daa8fa073baabd05))
+- Update API to VapourSynth R80 - ([4dd754a](https://github.com/inflation/vapoursynth4-rs/commit/4dd754aecc3630cf911f5c10abc922ec35d4eddf))
+
+### 🐛 Bug Fixes
+
+- Remove unneccessary renames - ([3cd14fe](https://github.com/inflation/vapoursynth4-rs/commit/3cd14fe5ddaed696d1758c48428487333307fe52))
+
+
 - Add the ST428 transfer constant and helper plugin identifiers.
 - Bind the R80 Vulkan API behind `vulkan`, using Ash Vulkan types.
 - Add VSScript API 4.4 and GPU-aware output and variable accessors.

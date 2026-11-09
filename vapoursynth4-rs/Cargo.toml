@@ -1,6 +1,6 @@
 [package]
 name = "vapoursynth4-rs"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.95"
 description = "A safe wrapper for VapourSynth and VSScript API version 4"
@@ -13,7 +13,7 @@ repository = "https://github.com/inflation/vapoursynth4-rs"
 [dependencies]
 bon = "3.10.1"
 thiserror = "2.0.20"
-vapoursynth4-sys = { version = "0.4.1", path = "../vapoursynth4-sys" }
+vapoursynth4-sys = { version = "0.5.0", path = "../vapoursynth4-sys" }
 
 [dev-dependencies]
 const-str = "1.1.0"
